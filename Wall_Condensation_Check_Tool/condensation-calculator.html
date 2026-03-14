@@ -1,0 +1,813 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>壁の結露計算ツール</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',sans-serif;background:#f0f4f8;color:#333;font-size:14px}
+
+/* ===== TOP NAV ===== */
+.top-nav{background:#1a3a6b;display:flex;align-items:center;gap:0;position:sticky;top:0;z-index:300;box-shadow:0 2px 8px rgba(0,0,0,.2)}
+.top-nav-title{color:#aac;font-size:12px;font-weight:700;padding:0 14px;white-space:nowrap;letter-spacing:.5px}
+.nav-btn{padding:13px 18px;border:none;background:transparent;color:#aac;font-size:13px;font-weight:600;cursor:pointer;border-bottom:3px solid transparent;transition:.15s;white-space:nowrap}
+.nav-btn.active{color:#fff;border-bottom-color:#fff}
+.nav-btn:hover{color:#fff}
+
+/* ===== PAGE VISIBILITY ===== */
+.page{display:none}
+.page.active{display:block}
+
+/* ===== CALC LAYOUT ===== */
+@media(min-width:800px){
+  .calc-app{display:flex;flex-direction:row;height:calc(100vh - 44px)}
+  .panel-left{width:410px;min-width:410px;max-width:410px;background:#fff;border-right:1px solid #ddd;padding:18px;overflow-y:auto;height:100%;flex-shrink:0}
+  .panel-right{flex:1;min-width:0;background:#f7f9fc;padding:18px;overflow-y:auto;height:100%}
+}
+@media(max-width:799px){
+  .calc-app{display:flex;flex-direction:column}
+  .panel-left{background:#fff;padding:14px}
+  .panel-right{background:#f7f9fc;padding:14px}
+}
+
+.section{margin-bottom:16px}
+h2{font-size:11px;font-weight:700;color:#1a3a6b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;padding-bottom:5px;border-bottom:2px solid #1a3a6b}
+
+.preset-btns{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.preset-btn{padding:6px 10px;border-radius:20px;border:2px solid #1a3a6b;background:#fff;color:#1a3a6b;cursor:pointer;font-size:11px;font-weight:700;white-space:nowrap;transition:.15s}
+.preset-btn.active{background:#1a3a6b;color:#fff}
+.preset-btn.p-cold{border-color:#cc0033;color:#cc0033}.preset-btn.p-cold.active{background:#cc0033;color:#fff}
+.preset-btn.p-hot{border-color:#e07800;color:#e07800}.preset-btn.p-hot.active{background:#e07800;color:#fff}
+
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+label.lbl{display:block;font-size:11px;color:#666;margin-bottom:3px}
+input[type=number],input[type=text]{width:100%;padding:8px 10px;border:1.5px solid #ccc;border-radius:8px;font-size:14px}
+input[type=number]:focus,input[type=text]:focus{outline:none;border-color:#1a3a6b}
+input[type=number]::-webkit-inner-spin-button{opacity:1}
+
+.mode-btns{display:flex;border:1.5px solid #ccc;border-radius:8px;overflow:hidden;margin-bottom:10px}
+.mode-btn{flex:1;padding:9px 4px;text-align:center;cursor:pointer;font-size:13px;background:#f5f5f5;border:none;transition:.15s}
+.mode-btn.active{background:#1a3a6b;color:#fff;font-weight:700}
+.chk-row{display:flex;gap:16px}
+.chk-row label{display:flex;align-items:center;gap:5px;font-size:12px;color:#444;cursor:pointer}
+
+.wall-preset-wrap{margin-bottom:10px}
+.wall-preset-row{display:flex;gap:6px;align-items:center}
+.wall-preset-row select{flex:1;padding:8px 8px;border:1.5px solid #4caf50;border-radius:8px;font-size:13px;background:#fff;color:#1a7a1a;font-weight:600}
+.wall-preset-row select:focus{outline:none;border-color:#2a9d2a}
+.wp-apply{padding:8px 12px;background:#2a7a2a;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0}
+.wp-apply:hover{background:#1a5a1a}
+
+.layer-list{display:flex;flex-direction:column;gap:6px}
+.layer-row{display:flex;align-items:center;gap:5px;flex-wrap:nowrap}
+.layer-num{width:18px;text-align:center;font-size:11px;color:#999;font-weight:700;flex-shrink:0}
+.layer-row select{flex:1 1 0;min-width:0;padding:8px 6px;border:1.5px solid #ccc;border-radius:8px;font-size:13px;background:#fff;appearance:auto;-webkit-appearance:auto}
+.layer-row select:focus{outline:none;border-color:#1a3a6b}
+.layer-thick{width:60px;min-width:60px;max-width:60px;flex:0 0 60px;padding:8px 4px;border:1.5px solid #ccc;border-radius:8px;font-size:13px;text-align:right}
+.del-btn{flex-shrink:0;background:none;border:none;color:#cc0033;font-size:20px;cursor:pointer;padding:2px 4px;line-height:1}
+.add-btn{margin-top:8px;padding:10px;background:#fff;border:2px dashed #1a3a6b;border-radius:8px;color:#1a3a6b;font-size:13px;font-weight:700;cursor:pointer;width:100%}
+
+.json-toolbar{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px}
+.jbtn{flex:1;min-width:70px;padding:7px 4px;border-radius:8px;border:none;font-size:11px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:3px;transition:.15s;white-space:nowrap}
+.jbtn-dl{background:#1a3a6b;color:#fff}.jbtn-dl:hover{background:#254d8f}
+.jbtn-ul{background:#fff;color:#1a3a6b;border:1.5px solid #1a3a6b}.jbtn-ul:hover{background:#eef2ff}
+.jbtn-view{background:#f0f4f8;color:#555;border:1.5px solid #ccc}.jbtn-view:hover{background:#e0e8f0}
+.jbtn-mat{background:#e8f5e9;color:#2a7a2a;border:1.5px solid #4caf50}.jbtn-mat:hover{background:#d0ecd0}
+.jbtn-wp{background:#fff3e0;color:#8a4a00;border:1.5px solid #e07800}.jbtn-wp:hover{background:#ffe0b0}
+
+.calc-btn{width:100%;padding:14px;background:#1a3a6b;color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;margin-top:6px;letter-spacing:.3px}
+.calc-btn:hover{background:#254d8f}
+
+.result-header{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
+.result-card{background:#fff;border-radius:12px;padding:14px;text-align:center;box-shadow:0 1px 4px rgba(0,0,0,.08)}
+.rc-label{font-size:11px;color:#888;margin-bottom:4px}
+.rc-value{font-size:26px;font-weight:800;color:#1a3a6b;line-height:1.1}
+.rc-sub{font-size:12px;font-weight:600;margin-top:3px}
+.chart-wrap{background:#fff;border-radius:12px;padding:14px;box-shadow:0 1px 4px rgba(0,0,0,.08);margin-bottom:12px}
+.chart-dir{display:flex;justify-content:space-between;font-size:11px;color:#555;margin-bottom:6px;font-weight:600}
+canvas{width:100%!important;display:block}
+.legend-row{display:flex;gap:10px;flex-wrap:wrap;margin-top:8px}
+.leg-item{display:flex;align-items:center;gap:4px;font-size:11px;color:#555}
+.leg-swatch{width:14px;height:14px;border-radius:2px;flex-shrink:0}
+.table-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;margin-top:8px}
+.detail-table{width:100%;border-collapse:collapse;font-size:12px;min-width:380px}
+.detail-table th{background:#1a3a6b;color:#fff;padding:6px 8px;text-align:center;white-space:nowrap}
+.detail-table td{padding:6px 8px;border-bottom:1px solid #eee;text-align:center;white-space:nowrap}
+.detail-table tr:last-child td{border-bottom:none}
+.sec-title{font-size:13px;font-weight:700;color:#1a3a6b;margin-bottom:4px}
+
+/* ===== MODAL ===== */
+.modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:400;align-items:center;justify-content:center;padding:16px}
+.modal-bg.open{display:flex}
+.modal{background:#fff;border-radius:14px;width:100%;max-width:580px;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 8px 32px rgba(0,0,0,.2)}
+.modal-head{padding:14px 16px;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center;flex-shrink:0}
+.modal-head h3{font-size:14px;font-weight:700;color:#1a3a6b}
+.modal-close{background:none;border:none;font-size:22px;cursor:pointer;color:#888;line-height:1}
+.modal-body{padding:14px 16px;overflow-y:auto;flex:1}
+.modal-foot{padding:10px 16px;border-top:1px solid #eee;display:flex;gap:8px;justify-content:flex-end;flex-shrink:0;flex-wrap:wrap}
+.mbtn{padding:8px 14px;border-radius:8px;border:none;font-size:13px;font-weight:700;cursor:pointer}
+.mbtn-ok{background:#1a3a6b;color:#fff}
+.mbtn-green{background:#2a7a2a;color:#fff}
+.mbtn-cancel{background:#f0f0f0;color:#555}
+.mbtn-danger{background:#fff;color:#cc0033;border:1.5px solid #cc0033}
+.json-ta{width:100%;height:200px;padding:10px;border:1.5px solid #ccc;border-radius:8px;font-family:monospace;font-size:12px;resize:vertical}
+.json-ta:focus{outline:none;border-color:#1a3a6b}
+.mat-table-wrap{overflow-x:auto}
+.mat-table{width:100%;border-collapse:collapse;font-size:12px;min-width:320px}
+.mat-table th{background:#1a3a6b;color:#fff;padding:6px 8px;text-align:left;white-space:nowrap}
+.mat-table td{padding:4px 5px;border-bottom:1px solid #eee;vertical-align:middle}
+.mat-table tr:last-child td{border-bottom:none}
+.mat-table input{padding:4px 6px;border:1px solid #ccc;border-radius:6px;font-size:12px;width:100%}
+.mat-table td:nth-child(2) input,.mat-table td:nth-child(3) input{text-align:right}
+.mat-table input:focus{outline:none;border-color:#1a3a6b}
+.mat-add-row{display:grid;grid-template-columns:1fr 80px 80px 36px;gap:5px;margin-top:8px;align-items:center}
+.mat-add-row input{padding:7px 8px;border:1.5px solid #ccc;border-radius:8px;font-size:12px}
+.mat-add-btn{padding:7px;background:#1a3a6b;color:#fff;border:none;border-radius:8px;font-size:18px;cursor:pointer;line-height:1}
+.wp-list{display:flex;flex-direction:column;gap:8px;margin-bottom:12px}
+.wp-item{border:1.5px solid #e0e0e0;border-radius:10px;overflow:hidden}
+.wp-item-head{display:flex;align-items:center;gap:8px;padding:8px 10px;background:#f8f9fa;cursor:pointer;user-select:none}
+.wp-item-head:hover{background:#eef2ff}
+.wp-item-name{flex:1;font-size:13px;font-weight:700;color:#1a3a6b}
+.wp-item-btns{display:flex;gap:4px}
+.wp-sm-btn{padding:4px 8px;border-radius:6px;border:none;font-size:11px;font-weight:700;cursor:pointer}
+.wp-sm-del{background:#fff0f0;color:#cc0033;border:1px solid #ffcccc}
+.wp-item-body{padding:10px;display:none;background:#fff}
+.wp-item-body.open{display:block}
+.wp-layer-mini{font-size:11px;color:#555;padding:2px 0;border-bottom:1px dashed #eee}
+.wp-layer-mini:last-child{border-bottom:none}
+.wp-new-form{background:#f8fff8;border:1.5px dashed #4caf50;border-radius:10px;padding:12px;margin-top:8px}
+.wp-new-form .lbl{font-size:11px;color:#666;margin-bottom:3px;display:block}
+.wp-new-form input{width:100%;padding:7px 10px;border:1.5px solid #ccc;border-radius:8px;font-size:13px;margin-bottom:8px}
+.wp-new-form input:focus{outline:none;border-color:#2a9d2a}
+.wp-new-hint{font-size:11px;color:#777;margin-bottom:6px}
+.err{color:#cc0033;font-size:11px;margin-top:4px}
+.info{color:#555;font-size:11px;margin-bottom:8px;line-height:1.6}
+.badge{display:inline-block;font-size:10px;padding:1px 6px;border-radius:8px;margin-left:4px}
+.badge-default{background:#e8f0fe;color:#1a3a6b}
+.badge-custom{background:#fff3e0;color:#8a4a00}
+
+/* ===== MANUAL PAGE ===== */
+.manual-wrap{max-width:860px;margin:0 auto;padding:24px 20px 48px}
+.manual-wrap h1{font-size:22px;font-weight:800;color:#1a3a6b;margin-bottom:4px}
+.manual-wrap .subtitle{font-size:13px;color:#888;margin-bottom:28px}
+.man-section{background:#fff;border-radius:12px;padding:20px 22px;margin-bottom:18px;box-shadow:0 1px 4px rgba(0,0,0,.07)}
+.man-section h2{font-size:15px;font-weight:700;color:#1a3a6b;margin-bottom:12px;padding-bottom:7px;border-bottom:2px solid #1a3a6b}
+.man-section h3{font-size:13px;font-weight:700;color:#254d8f;margin:14px 0 6px}
+.man-section p{font-size:13px;line-height:1.8;color:#444;margin-bottom:8px}
+.man-section p:last-child{margin-bottom:0}
+.formula-box{background:#f0f4ff;border-left:4px solid #1a3a6b;border-radius:0 8px 8px 0;padding:10px 14px;margin:10px 0;font-family:monospace;font-size:13px;line-height:2;color:#1a3a6b}
+.formula-box .comment{color:#888;font-family:'Segoe UI',sans-serif;font-size:11px}
+.var-table{width:100%;border-collapse:collapse;font-size:12px;margin:10px 0}
+.var-table th{background:#e8f0fe;color:#1a3a6b;padding:6px 10px;text-align:left;font-weight:700}
+.var-table td{padding:6px 10px;border-bottom:1px solid #eee;vertical-align:top}
+.var-table tr:last-child td{border-bottom:none}
+.var-table td:first-child{font-family:monospace;font-weight:700;color:#254d8f;white-space:nowrap}
+.tag{display:inline-block;font-size:10px;padding:2px 7px;border-radius:8px;font-weight:700;margin-left:4px;vertical-align:middle}
+.tag-calc{background:#e8f0fe;color:#1a3a6b}
+.tag-ui{background:#e8f5e9;color:#2a7a2a}
+.tag-io{background:#fff3e0;color:#8a4a00}
+.flow-list{counter-reset:flow;list-style:none;padding:0}
+.flow-list li{counter-increment:flow;display:flex;gap:10px;align-items:flex-start;margin-bottom:10px;font-size:13px;line-height:1.7;color:#444}
+.flow-list li::before{content:counter(flow);display:flex;align-items:center;justify-content:center;width:22px;height:22px;min-width:22px;background:#1a3a6b;color:#fff;border-radius:50%;font-size:11px;font-weight:700;margin-top:2px}
+.note-box{background:#fff8e1;border-left:4px solid #f9a825;border-radius:0 8px 8px 0;padding:10px 14px;font-size:12px;color:#555;line-height:1.7;margin:10px 0}
+.func-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;margin-top:8px}
+.func-card{background:#f8f9fa;border:1.5px solid #e0e0e0;border-radius:10px;padding:12px}
+.func-card .fc-title{font-size:12px;font-weight:700;color:#1a3a6b;margin-bottom:5px}
+.func-card .fc-body{font-size:11px;color:#555;line-height:1.6}
+</style>
+</head>
+<body>
+
+<!-- ===== TOP NAV ===== -->
+<nav class="top-nav">
+  <span class="top-nav-title">🏠 結露計算ツール</span>
+  <button class="nav-btn active" onclick="switchPage('calc',this)">計算ツール</button>
+  <button class="nav-btn" onclick="switchPage('manual',this)">マニュアル</button>
+</nav>
+
+<!-- ===== PAGE: CALC ===== -->
+<div class="page active" id="page-calc">
+<div class="calc-app">
+<div class="panel-left">
+  <div class="section">
+    <h2>1. 環境設定 (Environment)</h2>
+    <div class="preset-btns">
+      <button class="preset-btn" onclick="setPreset('std',this)">標準(冬)</button>
+      <button class="preset-btn p-cold active" onclick="setPreset('cold',this)">冬最低気温</button>
+      <button class="preset-btn p-hot" onclick="setPreset('hot',this)">猛暑(40°C)</button>
+      <button class="preset-btn" onclick="setPreset('summer',this)">一般夏期</button>
+    </div>
+    <div class="grid2">
+      <div><label class="lbl">外気温度 (°C)</label><input type="number" id="outTemp" value="-2" inputmode="decimal"></div>
+      <div><label class="lbl">外気湿度 (%)</label><input type="number" id="outHum" value="90" inputmode="decimal"></div>
+      <div><label class="lbl">室内温度 (°C)</label><input type="number" id="inTemp" value="22" inputmode="decimal"></div>
+      <div><label class="lbl">室内湿度 (%)</label><input type="number" id="inHum" value="60" inputmode="decimal"></div>
+    </div>
+  </div>
+  <div class="section">
+    <h2>2. 解析モード (Mode)</h2>
+    <div class="mode-btns">
+      <button class="mode-btn active" onclick="setMode('normal',this)">一般断熱部</button>
+      <button class="mode-btn" onclick="setMode('bridge',this)">熱橋部 (柱)</button>
+    </div>
+    <div class="chk-row">
+      <label><input type="checkbox" id="chkVent"> 通気層あり</label>
+      <label><input type="checkbox" id="chkFurni"> 家具裏・隅部</label>
+    </div>
+  </div>
+  <div class="section">
+    <h2>3. 壁構成 (Structure)</h2>
+    <div class="wall-preset-wrap">
+      <div class="wall-preset-row">
+        <select id="wallPresetSelect"><option value="">── 壁構成プリセットを選択 ──</option></select>
+        <button class="wp-apply" onclick="applyWallPreset()">適用</button>
+      </div>
+    </div>
+    <div class="json-toolbar">
+      <button class="jbtn jbtn-dl"  onclick="downloadJSON()">⬇ JSON保存</button>
+      <button class="jbtn jbtn-ul"  onclick="openUpload()">⬆ JSON読込</button>
+      <button class="jbtn jbtn-view" onclick="openViewJSON()">{ } 確認</button>
+      <button class="jbtn jbtn-mat" onclick="openMatEditor()">🔧 材料</button>
+      <button class="jbtn jbtn-wp"  onclick="openWpEditor()">📋 プリセット</button>
+    </div>
+    <div class="layer-list" id="layerList"></div>
+    <button class="add-btn" onclick="addLayer()">＋ 層を追加</button>
+    <input type="file" id="fileInput" accept=".json" style="display:none" onchange="loadJSON(event)">
+  </div>
+  <button class="calc-btn" onclick="calculate()">▶ 結露計算を実行</button>
+</div>
+<div class="panel-right">
+  <div class="result-header">
+    <div class="result-card">
+      <div class="rc-label">表面カビ・結露リスク</div>
+      <div class="rc-value" id="rsi">--</div>
+      <div class="rc-sub" id="rsiJudge">--</div>
+    </div>
+    <div class="result-card">
+      <div class="rc-label">壁体内結露</div>
+      <div class="rc-value" id="innerVal">--</div>
+      <div class="rc-sub" id="innerJudge">--</div>
+    </div>
+  </div>
+  <div class="chart-wrap">
+    <div class="chart-dir"><span>◀ 室内側 (Inside)</span><span>室外側 (Outside) ▶</span></div>
+    <canvas id="myChart"></canvas>
+    <div class="legend-row" id="layerLegend"></div>
+    <div class="legend-row" style="margin-top:4px">
+      <div class="leg-item"><svg width="28" height="10"><line x1="0" y1="5" x2="28" y2="5" stroke="#cc2233" stroke-width="2.5"/></svg>温度</div>
+      <div class="leg-item"><svg width="28" height="10"><line x1="0" y1="5" x2="28" y2="5" stroke="#4488ff" stroke-width="2" stroke-dasharray="5,3"/></svg>露点</div>
+    </div>
+  </div>
+  <div class="chart-wrap">
+    <div class="sec-title">📋 詳細計算結果</div>
+    <div class="table-scroll">
+      <table class="detail-table">
+        <thead><tr><th>#</th><th>材料</th><th>厚(mm)</th><th>熱抵抗</th><th>界面温度</th><th>判定</th></tr></thead>
+        <tbody id="detailBody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+</div>
+</div><!-- /page-calc -->
+
+<!-- ===== PAGE: MANUAL ===== -->
+<div class="page" id="page-manual">
+<div class="manual-wrap">
+  <h1>壁の結露計算ツール — 利用マニュアル</h1>
+  <p class="subtitle">ver 1.1 　計算手法・機能説明・操作ガイド</p>
+
+  <!-- 概要 -->
+  <div class="man-section">
+    <h2>📌 ツール概要</h2>
+    <p>本ツールは、建築壁体の<strong>定常状態における結露リスク</strong>を評価するためのWebツールです。ISO 13788 および グラスコ法（Glaser Method）に準じた手法で、温度分布・水蒸気圧分布を計算し、表面結露・壁体内結露の有無を判定します。</p>
+    <p>単一のHTMLファイルとして動作し、インターネット接続不要でPCおよびスマートフォンから利用できます。</p>
+  </div>
+
+  <!-- 計算フロー -->
+  <div class="man-section">
+    <h2>🔢 計算フロー</h2>
+    <ol class="flow-list">
+      <li>室内外の温度・湿度を入力し、各層の材料と厚みを設定する。</li>
+      <li>各層の熱抵抗 R を算出し、壁体全体の温度分布を求める。</li>
+      <li>各層の透湿抵抗 SD を算出し、水蒸気圧分布を求める。</li>
+      <li>各界面の温度から飽和水蒸気圧を求め、実水蒸気圧と比較する。</li>
+      <li>室内側表面温度と室内空気の露点温度を比較し、表面結露リスクを判定する。</li>
+    </ol>
+  </div>
+
+  <!-- 熱計算 -->
+  <div class="man-section">
+    <h2>🌡 熱移動の計算（温度分布）</h2>
+    <h3>各層の熱抵抗</h3>
+    <div class="formula-box">
+      R<sub>i</sub> = d<sub>i</sub> / λ<sub>i</sub>　[m²K/W]
+      <div class="comment">d : 層厚 (m)　λ : 熱伝導率 (W/mK)</div>
+    </div>
+    <h3>表面熱抵抗（固定値）</h3>
+    <div class="formula-box">
+      R<sub>si</sub> = 0.13 m²K/W　<span class="comment">（室内側）</span><br>
+      R<sub>so</sub> = 0.04 m²K/W　<span class="comment">（室外側）ISO 6946 準拠</span>
+    </div>
+    <h3>壁体全熱抵抗と界面温度</h3>
+    <div class="formula-box">
+      R<sub>total</sub> = R<sub>si</sub> + Σ R<sub>i</sub> + R<sub>so</sub><br>
+      T<sub>x</sub> = T<sub>i</sub> − (T<sub>i</sub> − T<sub>o</sub>) × ΣR<sub>x</sub> / R<sub>total</sub>
+      <div class="comment">T<sub>i</sub> : 室内温度　T<sub>o</sub> : 外気温度　ΣR<sub>x</sub> : 室内側からの累積熱抵抗</div>
+    </div>
+    <h3>熱橋補正（熱橋部モード）</h3>
+    <div class="formula-box">
+      R<sub>i,補正</sub> = R<sub>i</sub> × 1.3
+      <div class="comment">柱・スタッド等の熱橋により断熱性能が低下する部位に適用</div>
+    </div>
+  </div>
+
+  <!-- 湿気計算 -->
+  <div class="man-section">
+    <h2>💧 湿気移動の計算（グラスコ法）</h2>
+    <h3>透湿抵抗 SD</h3>
+    <div class="formula-box">
+      SD<sub>i</sub> = μ<sub>i</sub> × d<sub>i</sub>　[m]
+      <div class="comment">μ : 透湿抵抗係数（無次元）　d : 層厚 (m)</div>
+    </div>
+    <h3>水蒸気圧分布（定常・線形補間）</h3>
+    <div class="formula-box">
+      P<sub>v,x</sub> = P<sub>v,i</sub> − (P<sub>v,i</sub> − P<sub>v,o</sub>) × ΣSD<sub>x</sub> / SD<sub>total</sub>
+      <div class="comment">P<sub>v,i</sub> = psat(T<sub>i</sub>) × RH<sub>i</sub>　　P<sub>v,o</sub> = psat(T<sub>o</sub>) × RH<sub>o</sub></div>
+    </div>
+    <h3>飽和水蒸気圧（マグヌス式）</h3>
+    <div class="formula-box">
+      psat(T) = 610.78 × exp( 17.27T / (T + 237.3) )　[Pa]
+      <div class="comment">T : 温度 (°C)</div>
+    </div>
+    <h3>壁体内結露の判定</h3>
+    <div class="formula-box">
+      P<sub>v,x</sub> &gt; psat(T<sub>x</sub>)　→ 結露発生
+      <div class="comment">各界面において実水蒸気圧が飽和水蒸気圧を超えた場合に結露と判定</div>
+    </div>
+  </div>
+
+  <!-- 表面結露 -->
+  <div class="man-section">
+    <h2>🧊 表面結露・カビリスクの判定</h2>
+    <h3>室内側表面温度</h3>
+    <div class="formula-box">
+      T<sub>si</sub> = T<sub>i</sub> − (T<sub>i</sub> − T<sub>o</sub>) × R<sub>si</sub> / R<sub>total</sub>
+    </div>
+    <h3>温度係数 fRsi</h3>
+    <div class="formula-box">
+      fRsi = (T<sub>si</sub> − T<sub>o</sub>) / (T<sub>i</sub> − T<sub>o</sub>)
+      <div class="comment">ISO 13788 の表面温度係数。1に近いほど断熱性能が高い。</div>
+    </div>
+    <h3>室内空気の露点温度（マグヌス逆算）</h3>
+    <div class="formula-box">
+      T<sub>dew</sub> = 243.04 × [ln(RH) + 17.625T/(243.04+T)] / [17.625 − ln(RH) − 17.625T/(243.04+T)]
+    </div>
+    <h3>表面結露リスク判定</h3>
+    <div class="formula-box">
+      T<sub>si</sub> &lt; T<sub>dew</sub>　→ 表面結露・カビリスクあり
+    </div>
+    <div class="note-box">
+      ⚠ カビの発生はJIS A 1470等において相対湿度80%以上の状態が継続する場合にリスクが高まるとされています。本ツールの判定は定常条件での参考値です。
+    </div>
+  </div>
+
+  <!-- 変数一覧 -->
+  <div class="man-section">
+    <h2>📖 変数・パラメータ一覧</h2>
+    <table class="var-table">
+      <thead><tr><th>記号</th><th>意味</th><th>単位</th></tr></thead>
+      <tbody>
+        <tr><td>λ</td><td>熱伝導率</td><td>W/mK</td></tr>
+        <tr><td>μ</td><td>透湿抵抗係数（空気に対する比）</td><td>無次元</td></tr>
+        <tr><td>d</td><td>層厚</td><td>m</td></tr>
+        <tr><td>R</td><td>熱抵抗</td><td>m²K/W</td></tr>
+        <tr><td>SD</td><td>透湿抵抗（等価空気層厚）</td><td>m</td></tr>
+        <tr><td>T<sub>i</sub> / T<sub>o</sub></td><td>室内 / 外気温度</td><td>°C</td></tr>
+        <tr><td>RH<sub>i</sub> / RH<sub>o</sub></td><td>室内 / 外気相対湿度</td><td>−</td></tr>
+        <tr><td>P<sub>v</sub></td><td>水蒸気圧</td><td>Pa</td></tr>
+        <tr><td>psat</td><td>飽和水蒸気圧</td><td>Pa</td></tr>
+        <tr><td>T<sub>si</sub></td><td>室内側表面温度</td><td>°C</td></tr>
+        <tr><td>fRsi</td><td>温度係数（ISO 13788）</td><td>−</td></tr>
+        <tr><td>T<sub>dew</sub></td><td>露点温度</td><td>°C</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- 機能説明 -->
+  <div class="man-section">
+    <h2>⚙ 機能説明</h2>
+    <div class="func-grid">
+      <div class="func-card">
+        <div class="fc-title">🌡 環境プリセット <span class="tag tag-ui">UI</span></div>
+        <div class="fc-body">標準(冬) / 冬最低気温 / 猛暑(40°C) / 一般夏期の4種類の代表的な気象条件をワンタッチで設定できます。手動入力も可能です。</div>
+      </div>
+      <div class="func-card">
+        <div class="fc-title">🧱 壁構成プリセット <span class="tag tag-ui">UI</span></div>
+        <div class="fc-body">木造軸組・2×4・RC造など日本住宅でよく使われる6種類の標準構成を収録。「📋 プリセット」から追加・削除・カスタム登録が可能です。</div>
+      </div>
+      <div class="func-card">
+        <div class="fc-title">🔧 材料マスタ編集 <span class="tag tag-ui">UI</span></div>
+        <div class="fc-body">λ・μ値の変更、材料の追加・削除ができます。メーカーカタログ値への差し替えなど、実務仕様に合わせたカスタマイズが可能です。</div>
+      </div>
+      <div class="func-card">
+        <div class="fc-title">📊 温度・露点グラフ <span class="tag tag-calc">計算</span></div>
+        <div class="fc-body">壁体断面の温度分布（赤実線）と露点温度分布（青破線）を重ねて表示。結露が発生する界面は赤塗り●で強調表示されます。</div>
+      </div>
+      <div class="func-card">
+        <div class="fc-title">⬇ JSON保存 / ⬆ JSON読込 <span class="tag tag-io">入出力</span></div>
+        <div class="fc-body">環境設定・壁構成・材料マスタ・壁構成プリセットをすべて含む1つのJSONファイルで保存・復元できます。チームでの設定共有に活用できます。</div>
+      </div>
+      <div class="func-card">
+        <div class="fc-title">🔄 解析モード切替 <span class="tag tag-calc">計算</span></div>
+        <div class="fc-body">「一般断熱部」と「熱橋部（柱）」を切り替えられます。熱橋部モードでは熱抵抗に補正係数 1.3 を乗じて、柱部位等での性能低下を模擬します。</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 注意事項 -->
+  <div class="man-section">
+    <h2>⚠ 計算上の制限・注意事項</h2>
+    <p><strong>定常計算：</strong>本ツールは定常状態（温湿度が一定の条件）を前提とした計算です。実際の建物では温湿度は時間変動するため、本ツールの結果はリスク評価の参考値としてお使いください。</p>
+    <p><strong>1次元計算：</strong>壁厚方向のみの1次元熱湿気移動を仮定しています。コーナー部・開口部周りなど2次元的な熱橋の影響は考慮されません。</p>
+    <p><strong>熱橋補正：</strong>熱橋部モードの補正係数 1.3 は簡易的な値です。より精密な評価はISO 10211に基づく2次元数値計算が必要です。</p>
+    <p><strong>μ値：</strong>透湿抵抗係数は材料・製品によって幅があります。重要な検討ではメーカー実測値を使用してください。</p>
+    <p><strong>夏型逆結露：</strong>夏期に外側から湿気が浸入する「逆結露」は本ツールでは自動判定されません。夏期条件（猛暑プリセット等）を手動で設定して確認してください。</p>
+  </div>
+
+  <!-- 参考規格 -->
+  <div class="man-section">
+    <h2>📚 参考規格・文献</h2>
+    <table class="var-table">
+      <thead><tr><th>規格・文献</th><th>内容</th></tr></thead>
+      <tbody>
+        <tr><td>ISO 13788</td><td>建築部材の表面温度・壁体内結露評価（グラスコ法）</td></tr>
+        <tr><td>ISO 6946</td><td>熱抵抗・熱貫流率の計算方法（表面熱抵抗値）</td></tr>
+        <tr><td>ISO 10211</td><td>熱橋の2次元・3次元数値計算</td></tr>
+        <tr><td>JIS A 2101</td><td>建築材料の熱伝導率測定方法</td></tr>
+        <tr><td>国土交通省 住宅省エネ基準</td><td>断熱性能基準（UA値・熱抵抗値）</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+</div><!-- /page-manual -->
+
+<!-- ===== MODALS ===== -->
+<div class="modal-bg" id="modalView">
+  <div class="modal">
+    <div class="modal-head"><h3>{ } 設定 JSON</h3><button class="modal-close" onclick="closeModal('modalView')">×</button></div>
+    <div class="modal-body">
+      <p class="info">このJSONに環境設定・壁構成・材料DB・壁構成プリセットがすべて含まれます。</p>
+      <textarea class="json-ta" id="jsonViewArea" readonly></textarea>
+    </div>
+    <div class="modal-foot">
+      <button class="mbtn mbtn-ok" onclick="copyJSON()">📋 コピー</button>
+      <button class="mbtn mbtn-cancel" onclick="closeModal('modalView')">閉じる</button>
+    </div>
+  </div>
+</div>
+<div class="modal-bg" id="modalPaste">
+  <div class="modal">
+    <div class="modal-head"><h3>⬆ JSON読込</h3><button class="modal-close" onclick="closeModal('modalPaste')">×</button></div>
+    <div class="modal-body">
+      <p class="info">JSONをここに貼り付けるか、ファイルを選択してください。</p>
+      <textarea class="json-ta" id="jsonPasteArea" placeholder='{"layers":[...],"env":{...}}'></textarea>
+      <div class="err" id="pasteErr"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="mbtn mbtn-cancel" onclick="document.getElementById('fileInput').click()">📁 ファイル選択</button>
+      <button class="mbtn mbtn-ok" onclick="applyPastedJSON()">適用</button>
+      <button class="mbtn mbtn-cancel" onclick="closeModal('modalPaste')">閉じる</button>
+    </div>
+  </div>
+</div>
+<div class="modal-bg" id="modalMat">
+  <div class="modal">
+    <div class="modal-head"><h3>🔧 材料マスタ編集</h3><button class="modal-close" onclick="closeModal('modalMat')">×</button></div>
+    <div class="modal-body">
+      <p class="info">λ = 熱伝導率 (W/mK)　μ = 透湿抵抗係数</p>
+      <div class="mat-table-wrap">
+        <table class="mat-table">
+          <thead><tr><th style="min-width:120px">材料名</th><th style="width:80px">λ (W/mK)</th><th style="width:80px">μ</th><th style="width:36px"></th></tr></thead>
+          <tbody id="matTableBody"></tbody>
+        </table>
+      </div>
+      <div class="mat-add-row">
+        <input type="text" id="newMatName" placeholder="材料名">
+        <input type="number" id="newMatLam" placeholder="λ" step="0.001" inputmode="decimal">
+        <input type="number" id="newMatMu" placeholder="μ" inputmode="decimal">
+        <button class="mat-add-btn" onclick="addMatRow()">＋</button>
+      </div>
+      <div class="err" id="matErr"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="mbtn mbtn-danger" onclick="resetMat()">初期値に戻す</button>
+      <button class="mbtn mbtn-ok" onclick="saveMat()">保存</button>
+      <button class="mbtn mbtn-cancel" onclick="closeModal('modalMat')">キャンセル</button>
+    </div>
+  </div>
+</div>
+<div class="modal-bg" id="modalWp">
+  <div class="modal">
+    <div class="modal-head"><h3>📋 壁構成プリセット編集</h3><button class="modal-close" onclick="closeModal('modalWp')">×</button></div>
+    <div class="modal-body">
+      <p class="info">プリセットを選んで「適用」すると壁構成がワンタッチで切り替わります。</p>
+      <div class="wp-list" id="wpList"></div>
+      <div class="wp-new-form">
+        <label class="lbl">📌 現在の壁構成をプリセットとして保存</label>
+        <p class="wp-new-hint">現在設定中の層構成がそのまま登録されます。</p>
+        <input type="text" id="newWpName" placeholder="プリセット名（例：木造充填断熱 GW105）">
+        <button class="mbtn mbtn-green" onclick="saveCurrentAsPreset()" style="width:100%">＋ 現在の壁構成を保存</button>
+        <div class="err" id="wpErr"></div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="mbtn mbtn-danger" onclick="resetWallPresets()">初期値に戻す</button>
+      <button class="mbtn mbtn-cancel" onclick="closeModal('modalWp')">閉じる</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ===== PAGE SWITCH =====
+function switchPage(id,btn){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('page-'+id).classList.add('active');
+  btn.classList.add('active');
+  if(id==='calc') setTimeout(()=>{if(document.getElementById('detailBody').children.length) calculate();},50);
+}
+
+// ===== DATA =====
+const DEFAULT_MAT={
+  '石膏ボード':     [0.221,10],
+  '合板':           [0.16,300],
+  '防湿シート':     [0.20,100000],
+  '透湿防水シート': [0.20,50],
+  '高性能GW 16K':   [0.038,1],
+  '高性能GW 24K':   [0.036,1],
+  'ロックウール':   [0.038,1],
+  'セルロースF':    [0.040,2],
+  'EPS断熱材':      [0.036,60],
+  'XPS断熱材':      [0.028,150],
+  'PF断熱材':       [0.022,150],
+  'コンクリート':   [1.6,130],
+  'モルタル':       [1.5,100],
+  'ALC':            [0.17,10],
+  'タイル':         [1.3,200],
+  '木材':           [0.15,50],
+  '空気層':         [0.18,1],
+};
+const DEFAULT_WALL_PRESETS=[
+  {name:'①木造軸組・充填断熱（一般）',isDefault:true,layers:[{mat:'石膏ボード',t:12.5},{mat:'防湿シート',t:0.2},{mat:'高性能GW 16K',t:105},{mat:'透湿防水シート',t:0.2},{mat:'合板',t:9}]},
+  {name:'②木造軸組・付加断熱（ZEH）',isDefault:true,layers:[{mat:'石膏ボード',t:12.5},{mat:'防湿シート',t:0.2},{mat:'高性能GW 24K',t:105},{mat:'合板',t:9},{mat:'XPS断熱材',t:50},{mat:'透湿防水シート',t:0.2}]},
+  {name:'③2×4工法（ツーバイフォー）',isDefault:true,layers:[{mat:'石膏ボード',t:12.5},{mat:'防湿シート',t:0.2},{mat:'高性能GW 16K',t:140},{mat:'合板',t:11.5},{mat:'透湿防水シート',t:0.2}]},
+  {name:'④RC造・外断熱なし（既存）',isDefault:true,layers:[{mat:'石膏ボード',t:12.5},{mat:'空気層',t:20},{mat:'コンクリート',t:150},{mat:'モルタル',t:20}]},
+  {name:'⑤RC造・内断熱リノベ',isDefault:true,layers:[{mat:'石膏ボード',t:12.5},{mat:'EPS断熱材',t:50},{mat:'コンクリート',t:150},{mat:'モルタル',t:20}]},
+  {name:'⑥軽量鉄骨造（アパート系）',isDefault:true,layers:[{mat:'石膏ボード',t:12.5},{mat:'高性能GW 16K',t:75},{mat:'合板',t:9},{mat:'透湿防水シート',t:0.2}]},
+];
+let MAT=JSON.parse(JSON.stringify(DEFAULT_MAT));
+let wallPresets=JSON.parse(JSON.stringify(DEFAULT_WALL_PRESETS));
+let editingMat={};
+const ENV_PRESETS={std:{outTemp:-5,outHum:75,inTemp:20,inHum:50},cold:{outTemp:-2,outHum:90,inTemp:22,inHum:60},hot:{outTemp:40,outHum:50,inTemp:26,inHum:60},summer:{outTemp:33,outHum:80,inTemp:26,inHum:55}};
+const COLORS=['#ffd580','#a8d8ea','#b5e7a0','#f4a9a8','#d3b8e7','#fbe0c4','#c1e1c1','#b8d4f0','#f0d9a0','#d9a0c0'];
+let mode='normal';
+let layers=[{mat:'石膏ボード',t:12.5},{mat:'防湿シート',t:0.2},{mat:'高性能GW 16K',t:105}];
+
+// ===== WALL PRESETS =====
+function renderWallPresetSelect(){
+  const sel=document.getElementById('wallPresetSelect');
+  sel.innerHTML='<option value="">── 壁構成プリセットを選択 ──</option>';
+  wallPresets.forEach((wp,i)=>{
+    const opt=document.createElement('option');
+    opt.value=i; opt.textContent=wp.name+(wp.isDefault?'':' ★');
+    sel.appendChild(opt);
+  });
+}
+function applyWallPreset(){
+  const sel=document.getElementById('wallPresetSelect');
+  if(sel.value==='') return;
+  layers=wallPresets[+sel.value].layers.map(l=>({mat:l.mat,t:l.t}));
+  renderLayers(); sel.value='';
+}
+function openWpEditor(){renderWpList();document.getElementById('newWpName').value='';document.getElementById('wpErr').textContent='';openModal('modalWp');}
+function renderWpList(){
+  const wrap=document.getElementById('wpList'); wrap.innerHTML='';
+  if(!wallPresets.length){wrap.innerHTML='<p style="color:#999;font-size:12px;text-align:center;padding:12px">プリセットがありません</p>';return;}
+  wallPresets.forEach((wp,i)=>{
+    const item=document.createElement('div'); item.className='wp-item';
+    const lr=wp.layers.map(l=>`<div class="wp-layer-mini">${l.mat} — ${l.t} mm</div>`).join('');
+    item.innerHTML=`<div class="wp-item-head" onclick="toggleWpItem(${i})">
+      <span class="wp-item-name">${wp.name}</span>
+      <span class="badge ${wp.isDefault?'badge-default':'badge-custom'}">${wp.isDefault?'標準':'カスタム'}</span>
+      <div class="wp-item-btns"><button class="wp-sm-btn wp-sm-del" onclick="event.stopPropagation();delWpItem(${i})">削除</button></div>
+    </div><div class="wp-item-body" id="wpBody${i}">${lr}</div>`;
+    wrap.appendChild(item);
+  });
+}
+function toggleWpItem(i){document.getElementById('wpBody'+i).classList.toggle('open');}
+function delWpItem(i){if(!confirm(`「${wallPresets[i].name}」を削除しますか？`))return; wallPresets.splice(i,1);renderWpList();renderWallPresetSelect();}
+function saveCurrentAsPreset(){
+  const name=document.getElementById('newWpName').value.trim();
+  const err=document.getElementById('wpErr');
+  if(!name){err.textContent='プリセット名を入力してください';return;}
+  if(wallPresets.some(w=>w.name===name)){err.textContent='同名のプリセットが既に存在します';return;}
+  wallPresets.push({name,isDefault:false,layers:layers.map(l=>({mat:l.mat,t:l.t}))});
+  err.textContent=''; document.getElementById('newWpName').value='';
+  renderWpList(); renderWallPresetSelect();
+}
+function resetWallPresets(){
+  if(!confirm('プリセットを初期値に戻しますか？'))return;
+  wallPresets=JSON.parse(JSON.stringify(DEFAULT_WALL_PRESETS));
+  renderWpList(); renderWallPresetSelect();
+}
+
+// ===== ENV =====
+function setPreset(key,btn){
+  document.querySelectorAll('.preset-btn').forEach(b=>b.classList.remove('active')); btn.classList.add('active');
+  const p=ENV_PRESETS[key];
+  document.getElementById('outTemp').value=p.outTemp; document.getElementById('outHum').value=p.outHum;
+  document.getElementById('inTemp').value=p.inTemp;   document.getElementById('inHum').value=p.inHum;
+}
+function setMode(m,btn){mode=m;document.querySelectorAll('.mode-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');}
+
+// ===== LAYERS =====
+function renderLayers(){
+  const list=document.getElementById('layerList'); list.innerHTML='';
+  layers.forEach((l,i)=>{
+    const row=document.createElement('div'); row.className='layer-row';
+    const opts=Object.keys(MAT).map(m=>`<option${m===l.mat?' selected':''}>${m}</option>`).join('');
+    row.innerHTML=`<span class="layer-num">${i+1}</span>
+      <select onchange="layers[${i}].mat=this.value">${opts}</select>
+      <input class="layer-thick" type="number" value="${l.t}" step="0.1" inputmode="decimal" onchange="layers[${i}].t=+this.value">
+      <button class="del-btn" onclick="delLayer(${i})">×</button>`;
+    list.appendChild(row);
+  });
+}
+function addLayer(){layers.push({mat:Object.keys(MAT)[0],t:12.5});renderLayers();}
+function delLayer(i){layers.splice(i,1);renderLayers();}
+
+// ===== JSON =====
+function buildJSON(){
+  return {
+    meta:{title:"壁結露計算データ",version:"1.1",created:new Date().toISOString()},
+    env:{outTemp:+document.getElementById('outTemp').value,outHum:+document.getElementById('outHum').value,inTemp:+document.getElementById('inTemp').value,inHum:+document.getElementById('inHum').value,mode,ventilation:document.getElementById('chkVent').checked,furniture:document.getElementById('chkFurni').checked},
+    layers:layers.map(l=>({mat:l.mat,t:l.t})),
+    materialDB:MAT,wallPresets,
+  };
+}
+function applyJSON(obj){
+  if(obj.env){const e=obj.env;
+    if(e.outTemp!==undefined) document.getElementById('outTemp').value=e.outTemp;
+    if(e.outHum !==undefined) document.getElementById('outHum').value=e.outHum;
+    if(e.inTemp !==undefined) document.getElementById('inTemp').value=e.inTemp;
+    if(e.inHum  !==undefined) document.getElementById('inHum').value=e.inHum;
+    if(e.mode){mode=e.mode;document.querySelectorAll('.mode-btn').forEach((b,i)=>b.classList.toggle('active',(i===0&&mode==='normal')||(i===1&&mode==='bridge')));}
+    if(e.ventilation!==undefined) document.getElementById('chkVent').checked=e.ventilation;
+    if(e.furniture  !==undefined) document.getElementById('chkFurni').checked=e.furniture;
+  }
+  if(obj.materialDB) MAT=obj.materialDB;
+  if(obj.wallPresets) wallPresets=obj.wallPresets;
+  if(obj.layers) layers=obj.layers.map(l=>({mat:l.mat,t:+l.t}));
+  renderLayers(); renderWallPresetSelect();
+}
+function downloadJSON(){
+  const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([JSON.stringify(buildJSON(),null,2)],{type:'application/json'}));
+  a.download='wall_condensation.json'; a.click();
+}
+function openUpload(){document.getElementById('jsonPasteArea').value='';document.getElementById('pasteErr').textContent='';openModal('modalPaste');}
+function loadJSON(e){
+  const file=e.target.files[0]; if(!file)return;
+  const r=new FileReader(); r.onload=ev=>{try{applyJSON(JSON.parse(ev.target.result));closeModal('modalPaste');}catch(err){document.getElementById('pasteErr').textContent='解析失敗: '+err.message;}};
+  r.readAsText(file); e.target.value='';
+}
+function applyPastedJSON(){try{applyJSON(JSON.parse(document.getElementById('jsonPasteArea').value.trim()));closeModal('modalPaste');}catch(err){document.getElementById('pasteErr').textContent='解析失敗: '+err.message;}}
+function openViewJSON(){document.getElementById('jsonViewArea').value=JSON.stringify(buildJSON(),null,2);openModal('modalView');}
+function copyJSON(){const ta=document.getElementById('jsonViewArea');ta.select();document.execCommand('copy');alert('コピーしました');}
+
+// ===== MAT EDITOR =====
+function openMatEditor(){editingMat=JSON.parse(JSON.stringify(MAT));renderMatTable();document.getElementById('matErr').textContent='';openModal('modalMat');}
+function renderMatTable(){
+  const tbody=document.getElementById('matTableBody'); tbody.innerHTML='';
+  Object.entries(editingMat).forEach(([name,[lam,mu]],i)=>{
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td><input type="text" value="${name}" onchange="renameMatKey(${i},this.value)"></td>
+      <td><input type="number" value="${lam}" step="0.001" inputmode="decimal" onchange="editMatVal(${i},0,+this.value)"></td>
+      <td><input type="number" value="${mu}" step="1" inputmode="decimal" onchange="editMatVal(${i},1,+this.value)"></td>
+      <td><button class="del-btn" onclick="delMatRow(${i})">×</button></td>`;
+    tbody.appendChild(tr);
+  });
+}
+function renameMatKey(idx,n){editingMat=Object.fromEntries(Object.entries(editingMat).map(([k,v],i)=>i===idx?[n,v]:[k,v]));}
+function editMatVal(idx,vi,val){const k=Object.keys(editingMat)[idx];editingMat[k][vi]=val;}
+function delMatRow(idx){delete editingMat[Object.keys(editingMat)[idx]];renderMatTable();}
+function addMatRow(){
+  const name=document.getElementById('newMatName').value.trim(),lam=+document.getElementById('newMatLam').value,mu=+document.getElementById('newMatMu').value;
+  const err=document.getElementById('matErr');
+  if(!name){err.textContent='材料名を入力してください';return;}
+  if(editingMat[name]){err.textContent='同名が既に存在します';return;}
+  if(lam<=0||mu<=0){err.textContent='λ・μは正の値を入力してください';return;}
+  editingMat[name]=[lam,mu]; err.textContent='';
+  ['newMatName','newMatLam','newMatMu'].forEach(id=>document.getElementById(id).value='');
+  renderMatTable();
+}
+function saveMat(){
+  const res={};
+  document.querySelectorAll('#matTableBody tr').forEach(tr=>{
+    const ins=tr.querySelectorAll('input'),name=ins[0].value.trim(),lam=+ins[1].value,mu=+ins[2].value;
+    if(name&&lam>0&&mu>0) res[name]=[lam,mu];
+  });
+  MAT=res; layers=layers.map(l=>({mat:MAT[l.mat]?l.mat:Object.keys(MAT)[0],t:l.t}));
+  renderLayers(); closeModal('modalMat');
+}
+function resetMat(){if(!confirm('材料マスタを初期値に戻しますか？'))return; editingMat=JSON.parse(JSON.stringify(DEFAULT_MAT));renderMatTable();}
+
+// ===== MODAL =====
+function openModal(id){document.getElementById(id).classList.add('open');}
+function closeModal(id){document.getElementById(id).classList.remove('open');}
+document.querySelectorAll('.modal-bg').forEach(bg=>bg.addEventListener('click',e=>{if(e.target===bg)bg.classList.remove('open');}));
+
+// ===== CALC =====
+function psat(T){return 610.78*Math.exp(17.27*T/(T+237.3));}
+function solveT(pv){const lp=Math.log(pv/610.78);return 237.3*lp/(17.27-lp);}
+function calculate(){
+  const Ti=+document.getElementById('inTemp').value,To=+document.getElementById('outTemp').value;
+  const RHi=+document.getElementById('inHum').value/100,RHo=+document.getElementById('outHum').value/100;
+  const bf=mode==='bridge'?1.3:1.0,Rsi=0.13,Rso=0.04;
+  const Rs=layers.map(l=>(l.t/1000)/(MAT[l.mat]?MAT[l.mat][0]:0.2)*bf);
+  const Rt=Rsi+Rs.reduce((a,b)=>a+b,0)+Rso;
+  const Xs=[0]; layers.forEach(l=>Xs.push(Xs[Xs.length-1]+l.t));
+  const Temps=[Ti]; let cumR=Rsi;
+  Rs.forEach(r=>{cumR+=r;Temps.push(Ti-(Ti-To)*cumR/Rt);}); Temps.push(To);
+  const SDs=layers.map(l=>(MAT[l.mat]?MAT[l.mat][1]:1)*l.t/1000);
+  const SDt=SDs.reduce((a,b)=>a+b,0),Pi=psat(Ti)*RHi,Po=psat(To)*RHo;
+  const Pvaps=[Pi]; let cumSD=0;
+  SDs.forEach(sd=>{cumSD+=sd;Pvaps.push(Pi-(Pi-Po)*cumSD/SDt);}); Pvaps.push(Po);
+  const Psats=Temps.map(t=>psat(t));
+  let cond=false; for(let i=1;i<Pvaps.length-1;i++) if(Pvaps[i]>Psats[i]) cond=true;
+  const Tsi=Ti-(Ti-To)*Rsi/Rt,fRsi=(Tsi-To)/(Ti-To);
+  const Td=243.04*(Math.log(RHi)+17.625*Ti/(243.04+Ti))/(17.625-Math.log(RHi)-17.625*Ti/(243.04+Ti));
+  const surfOk=Tsi>Td;
+  const set=(id,v,c)=>{const el=document.getElementById(id);el.textContent=v;el.style.color=c;};
+  set('rsi',(fRsi*100).toFixed(1)+'%',surfOk?'#2a9d2a':'#cc0033');
+  set('rsiJudge',surfOk?'✓ 安全':'⚠ リスクあり',surfOk?'#2a9d2a':'#cc0033');
+  set('innerVal',cond?'あり':'なし',cond?'#cc0033':'#1a3a6b');
+  set('innerJudge',cond?'⚠ 要対策':'✓ 問題なし',cond?'#cc0033':'#2a9d2a');
+  drawChart(Xs,Temps,Pvaps,Psats);
+  const tbody=document.getElementById('detailBody'); tbody.innerHTML='';
+  layers.forEach((l,i)=>{
+    const ok=Pvaps[i+1]<=Psats[i+1],tr=document.createElement('tr');
+    tr.innerHTML=`<td>${i+1}</td><td style="text-align:left">${l.mat}</td><td>${l.t}</td><td>${Rs[i].toFixed(4)}</td><td>${Temps[i+1].toFixed(1)}°C</td><td style="color:${ok?'#2a9d2a':'#cc0033'};font-weight:700">${ok?'✓ OK':'✗ 結露'}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+function drawChart(Xs,Temps,Pvaps,Psats){
+  const canvas=document.getElementById('myChart'),dpr=Math.min(devicePixelRatio||1,2);
+  const W=canvas.parentElement.clientWidth-28,H=Math.max(180,Math.min(240,W*0.42));
+  canvas.width=W*dpr;canvas.height=H*dpr;canvas.style.width=W+'px';canvas.style.height=H+'px';
+  const ctx=canvas.getContext('2d');ctx.scale(dpr,dpr);
+  const P={l:38,r:10,t:16,b:32},cw=W-P.l-P.r,ch=H-P.t-P.b;
+  const totalX=Xs[Xs.length-1],Tmin=Math.min(...Temps)-3,Tmax=Math.max(...Temps)+3;
+  const cx=x=>P.l+(x/totalX)*cw,cy=t=>P.t+ch-((t-Tmin)/(Tmax-Tmin))*ch;
+  const legend=document.getElementById('layerLegend');legend.innerHTML='';
+  Xs.forEach((x,i)=>{
+    if(i>=Xs.length-1)return;
+    const col=COLORS[i%COLORS.length];ctx.fillStyle=col+'99';ctx.fillRect(cx(x),P.t,cx(Xs[i+1])-cx(x),ch);
+    legend.innerHTML+=`<div class="leg-item"><div class="leg-swatch" style="background:${col}"></div>${layers[i].mat}</div>`;
+  });
+  ctx.lineWidth=1;ctx.strokeStyle='#ddd';
+  const tStep=Math.max(2,Math.ceil((Tmax-Tmin)/6/2)*2);
+  for(let t=Math.ceil(Tmin/tStep)*tStep;t<=Tmax;t+=tStep){
+    const y=cy(t);ctx.beginPath();ctx.moveTo(P.l,y);ctx.lineTo(P.l+cw,y);ctx.stroke();
+    ctx.fillStyle='#888';ctx.font='9px sans-serif';ctx.textAlign='right';ctx.fillText(t,P.l-3,y+3);
+  }
+  const xStep=Math.ceil(totalX/5/10)*10||10;
+  for(let x=0;x<=totalX;x+=xStep){
+    ctx.beginPath();ctx.moveTo(cx(x),P.t);ctx.lineTo(cx(x),P.t+ch);ctx.stroke();
+    ctx.fillStyle='#888';ctx.textAlign='center';ctx.font='9px sans-serif';ctx.fillText(x,cx(x),P.t+ch+13);
+  }
+  ctx.fillStyle='#666';ctx.textAlign='center';ctx.font='10px sans-serif';ctx.fillText('距離 (mm)',P.l+cw/2,H-2);
+  ctx.save();ctx.translate(11,P.t+ch/2);ctx.rotate(-Math.PI/2);ctx.fillText('温度 (°C)',0,0);ctx.restore();
+  if(Tmin<0&&Tmax>0){ctx.strokeStyle='#bbb';ctx.setLineDash([4,3]);ctx.beginPath();ctx.moveTo(P.l,cy(0));ctx.lineTo(P.l+cw,cy(0));ctx.stroke();ctx.setLineDash([]);}
+  ctx.strokeStyle='#4488ff';ctx.setLineDash([6,4]);ctx.lineWidth=1.5;ctx.beginPath();
+  Pvaps.forEach((pv,i)=>{const xp=i===0?0:(i===Pvaps.length-1?totalX:Xs[i]);i===0?ctx.moveTo(cx(xp),cy(solveT(pv))):ctx.lineTo(cx(xp),cy(solveT(pv)));});
+  ctx.stroke();ctx.setLineDash([]);
+  ctx.strokeStyle='#cc2233';ctx.lineWidth=2.5;ctx.beginPath();
+  Temps.forEach((t,i)=>{const xp=i===0?0:(i===Temps.length-1?totalX:Xs[i]);i===0?ctx.moveTo(cx(xp),cy(t)):ctx.lineTo(cx(xp),cy(t));});
+  ctx.stroke();
+  Temps.forEach((t,i)=>{
+    const xp=i===0?0:(i===Temps.length-1?totalX:Xs[i]);
+    const condensed=i>0&&i<Pvaps.length-1&&Pvaps[i]>Psats[i];
+    ctx.beginPath();ctx.arc(cx(xp),cy(t),4,0,Math.PI*2);
+    ctx.fillStyle=condensed?'#cc0033':'#fff';ctx.fill();
+    ctx.strokeStyle=condensed?'#cc0033':'#cc2233';ctx.lineWidth=2;ctx.stroke();
+    ctx.fillStyle='#222';ctx.font='bold 9px sans-serif';ctx.textAlign='center';ctx.fillText(t.toFixed(1),cx(xp),cy(t)-7);
+  });
+}
+
+renderWallPresetSelect();renderLayers();calculate();
+window.addEventListener('resize',()=>{if(document.getElementById('page-calc').classList.contains('active')&&document.getElementById('detailBody').children.length) calculate();});
+</script>
+</body>
+</html>
