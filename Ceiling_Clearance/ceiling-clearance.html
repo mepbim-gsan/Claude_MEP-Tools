@@ -530,9 +530,9 @@ function calcPattern(p) {
 // ══ PC TABLE ══════════════════════════════════
 // モードに関わらず全行表示。非該当行はグレーアウト＋入力不可で位置を固定する
 function isKeyActive(key) {
-  if (key==='sh')  return calcMode !== 'sh';
-  if (key==='mep') return calcMode !== 'mep';
-  if (key==='cl')  return calcMode !== 'ceiling';
+  if (key==='sh')  return calcMode !== 'sh';       // sh算定モードのとき算出
+  if (key==='mep') return calcMode !== 'ceiling';  // 梁下有効算定モードのとき算出
+  if (key==='cl')  return calcMode !== 'mep';      // 天井高算定モードのとき算出
   return true;
 }
 
@@ -838,9 +838,9 @@ function renderResults(results){
       mainLbl = '必要階高 (mm)';
       sub     = '';
     } else {
-      mainVal = r.mode==='mep' ? r.clear : r.mep_avail;
-      mainLbl = r.mode==='mep' ? '有効高さ (mm)' : '梁下有効スペース (mm)';
-      sub     = r.mode==='mep' ? `天井懐 ${r.plenum}mm` : `天井高 FL+${r.cl}mm`;
+      mainVal = r.mode==='ceiling' ? r.mep_avail : r.clear;
+      mainLbl = r.mode==='ceiling' ? '梁下有効スペース (mm)' : '天井高 (mm)';
+      sub     = r.mode==='ceiling' ? `天井高 FL+${r.cl}mm` : `天井懐 ${r.plenum}mm`;
     }
     const card=document.createElement('div');
     card.className='rc ok';
