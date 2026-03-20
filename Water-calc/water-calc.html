@@ -1,0 +1,1448 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>瞬時最大給水流量計算</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{--accent:#1a3a6b;--accent-light:#2a5298;--accent-pale:#e8eef8;--bg:#f0f4f8;--card:#fff;--border:#d0d8e4;--text:#1a2332;--text-muted:#6b7a8d;--red:#8b1a1a;--red-bg:#fdf0f0;--yellow:#7a6b00;--yellow-bg:#fdf8e0;--green:#1a6b3a;--green-bg:#e8f5ee;--blue:#1a4a8b;--blue-bg:#e8f0fc;--blue-border:#b0c8f0;--mono:'IBM Plex Mono',monospace;--sans:'Noto Sans JP',sans-serif;--radius:8px;--shadow:0 2px 8px rgba(26,58,107,.1)}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--sans);background:var(--bg);color:var(--text);font-size:14px;min-height:100vh}
+.nav{background:var(--accent);color:#fff;padding:0 12px;position:sticky;top:0;z-index:100;box-shadow:0 2px 8px rgba(0,0,0,.2)}
+.nav-inner{max-width:1100px;margin:0 auto;display:flex;align-items:center}
+.nav-title{font-size:13px;font-weight:700;padding:13px 12px 13px 0;white-space:nowrap;border-right:1px solid rgba(255,255,255,.2);margin-right:4px;flex-shrink:0}
+.tab-btn{background:none;border:none;color:rgba(255,255,255,.7);padding:13px 12px;cursor:pointer;font-family:var(--sans);font-size:12px;font-weight:500;border-bottom:3px solid transparent;transition:all .15s;white-space:nowrap}
+.tab-btn.active{color:#fff;border-bottom-color:#7eb3ff}
+.tab-btn:hover{color:#fff}
+.main{max-width:1100px;margin:0 auto;padding:16px}
+.card{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);border:1px solid var(--border);padding:16px;margin-bottom:16px}
+.card.unsaved{border-color:var(--blue-border);box-shadow:0 0 0 2px rgba(26,74,139,.15)}
+.card-title{font-size:13px;font-weight:700;color:var(--accent);margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid var(--accent-pale);display:flex;align-items:center;gap:8px}
+.card-title.unsaved{color:var(--blue)}
+.btn{border:none;border-radius:6px;padding:8px 14px;font-family:var(--sans);font-size:13px;font-weight:500;cursor:pointer;transition:all .15s;display:inline-flex;align-items:center;gap:6px}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-primary:hover{background:var(--accent-light)}
+.btn-secondary{background:var(--accent-pale);color:var(--accent);border:1px solid var(--border)}
+.btn-secondary:hover{background:#d8e4f4}
+.btn-danger{background:var(--red-bg);color:var(--red);border:1px solid #f0c0c0}
+.btn-danger:hover{background:#f5d0d0}
+.btn-success{background:var(--green-bg);color:var(--green);border:1px solid #b0dfc0}
+.btn-success:hover{background:#d0eed8}
+.btn-sm{padding:5px 10px;font-size:12px}
+.btn-icon{width:36px;height:36px;padding:0;border-radius:6px;display:inline-flex;align-items:center;justify-content:center;font-size:18px;font-weight:700}
+.btn-plus{background:var(--accent);color:#fff}
+.btn-minus{background:#f0f0f0;color:#444;border:1px solid #ccc}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+input[type=text],input[type=number],select{border:1px solid var(--border);border-radius:6px;padding:7px 10px;font-family:var(--sans);font-size:13px;color:var(--text);background:#fff;width:100%;transition:border-color .15s}
+input[type=text]:focus,input[type=number]:focus,select:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(26,58,107,.1)}
+input[type=number]{font-family:var(--mono)}
+input[type=number]::-webkit-inner-spin-button{opacity:1}
+.form-row{display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap}
+.form-label{font-size:12px;color:var(--text-muted);white-space:nowrap}
+.form-group{display:flex;flex-direction:column;gap:4px}
+.tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+table{border-collapse:collapse;width:100%;min-width:400px}
+.result-tbl{min-width:0;width:100%}
+.result-tbl td.label,.result-tbl th.label{white-space:nowrap;width:1%}
+th{background:var(--accent);color:#fff;padding:8px 10px;font-size:12px;font-weight:500;text-align:center;white-space:nowrap}
+th.left{text-align:left}
+td{padding:7px 10px;border-bottom:1px solid var(--border);font-size:13px;vertical-align:middle}
+td.mono{font-family:var(--mono);text-align:right}
+td.center{text-align:center}
+td.rnum{font-family:var(--mono);text-align:right;width:72px;padding-right:10px}
+td.nowrap{white-space:nowrap}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:var(--accent-pale)}
+.flow-table td.valve{background:#fff5ee}
+.flow-table td.tank{background:#f0f6ff}
+.flow-val{font-family:var(--mono);font-size:17px;font-weight:700;display:block}
+.floor-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:10px;box-shadow:var(--shadow);overflow:hidden}
+.floor-card.has-orphan{border-color:#f0c0c0}
+.floor-header{display:flex;align-items:center;padding:12px 14px;cursor:pointer;background:var(--card);user-select:none;gap:10px}
+.floor-header:hover{background:var(--accent-pale)}
+.floor-name-input{flex:1;border:none;background:transparent;font-family:var(--sans);font-size:14px;font-weight:700;color:var(--accent);cursor:text;padding:2px 4px;border-radius:4px;min-width:60px}
+.floor-name-input:focus{outline:none;background:#fff;border:1px solid var(--accent);box-shadow:none}
+.floor-wu-summary{font-family:var(--mono);font-size:11px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:180px}
+.floor-chevron{color:var(--text-muted);font-size:12px;transition:transform .2s;flex-shrink:0}
+.floor-chevron.open{transform:rotate(180deg)}
+.floor-body{display:none;padding:0 14px 14px}
+.floor-body.open{display:block}
+.fixture-rows{display:flex;flex-direction:column;gap:6px}
+.fixture-row{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--bg);border-radius:6px}
+.fixture-row.orphan{background:var(--red-bg);border:1px solid #f0c0c0}
+.fixture-name{flex:1;font-size:13px;min-width:80px}
+.fixture-name.orphan{color:var(--red);font-weight:600}
+.fixture-count-wrap{display:flex;align-items:center;gap:6px;flex-shrink:0}
+.count-input{width:56px!important;text-align:center;font-family:var(--mono);padding:6px 4px!important}
+.fixture-wu-display{font-family:var(--mono);font-size:11px;color:var(--text-muted);width:60px;text-align:right;flex-shrink:0}
+.orphan-badge{font-size:10px;color:var(--red);background:#fde0e0;border:1px solid #f0c0c0;border-radius:4px;padding:1px 5px;white-space:nowrap;flex-shrink:0}
+.floor-warn{font-size:11px;color:var(--red);background:#fde0e0;border:1px solid #f0c0c0;border-radius:4px;padding:2px 7px;white-space:nowrap;flex-shrink:0}
+/* 器具行変更ハイライト */
+tr.fx-added td{background:#edf7ed!important}
+tr.fx-edited td{background:#e8f0fc!important}
+.fixture-deleted-note{font-size:11px;color:var(--text-muted);margin-top:6px}
+/* マスタ管理 */
+.master-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+.master-name-badge{font-size:13px;font-weight:700;color:var(--accent);padding:6px 10px;background:var(--accent-pale);border-radius:6px;flex-shrink:0;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.master-name-badge.unsaved{color:var(--blue);background:var(--blue-bg);border:1px solid var(--blue-border)}
+.master-status-badge{font-size:11px;font-weight:600;color:var(--blue);background:var(--blue-bg);border:1px solid var(--blue-border);border-radius:4px;padding:3px 8px;white-space:nowrap;flex-shrink:0}
+.master-btn-group{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+.master-btn-group .btn{flex:1;justify-content:center;min-width:0}
+/* マスタ一覧 */
+.master-list{display:flex;flex-direction:column;gap:6px;max-height:340px;overflow-y:auto;margin-bottom:12px}
+.master-item{display:flex;align-items:center;gap:8px;padding:10px 12px;border:1px solid var(--border);border-radius:6px;background:var(--bg)}
+.master-item.active-master{border-color:var(--accent);background:var(--accent-pale)}
+.master-item-name{flex:1;font-size:13px}
+.master-item-name input{border:1px solid transparent;background:transparent;font-family:var(--sans);font-size:13px;color:var(--text);width:100%;padding:3px 5px;border-radius:4px}
+.master-item-name input:focus{outline:none;border-color:var(--accent);background:#fff}
+.builtin-lock{font-size:11px;color:var(--text-muted);white-space:nowrap;flex-shrink:0}
+.sub-tabs{display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap}
+.sub-tab{padding:6px 14px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;border:2px solid var(--border);background:#fff;color:var(--text-muted);transition:all .15s}
+.sub-tab.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:1000;display:flex;align-items:center;justify-content:center;padding:16px}
+.modal-overlay.hidden{display:none}
+.modal{background:var(--card);border-radius:var(--radius);padding:20px;max-width:480px;width:100%;box-shadow:0 8px 32px rgba(0,0,0,.2)}
+.modal-title{font-size:15px;font-weight:700;color:var(--accent);margin-bottom:12px}
+.modal-body{font-size:13px;color:var(--text-muted);margin-bottom:4px;line-height:1.6}
+.modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:16px}
+.io-row{display:flex;gap:8px;flex-wrap:wrap}
+.note{background:var(--yellow-bg);border:1px solid #e0d060;border-radius:6px;padding:8px 12px;font-size:12px;color:var(--yellow);margin-top:8px}
+.manual-section{margin-bottom:24px}
+.manual-section h3{font-size:14px;font-weight:700;color:var(--accent);margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--accent-pale)}
+.manual-section p{font-size:13px;line-height:1.8;margin-bottom:8px;color:var(--text)}
+.manual-section ul{font-size:13px;line-height:1.8;padding-left:20px;color:var(--text)}
+.manual-section li{margin-bottom:4px}
+.formula-box{background:#f8f9fc;border:1px solid var(--border);border-radius:6px;padding:12px;font-family:var(--mono);font-size:12px;line-height:1.8;margin:8px 0;color:var(--text)}
+@media(max-width:800px){.main{padding:10px}.nav-title{font-size:11px}.tab-btn{padding:13px 8px;font-size:11px}.floor-wu-summary{max-width:80px}.pc-only{display:none!important}}
+/* PC器具グリッドテーブル */
+.grid-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;border-radius:var(--radius);border:1px solid var(--border)}
+.fx-grid{border-collapse:separate;border-spacing:0;width:max-content;min-width:100%}
+.fx-grid th,.fx-grid td{border-bottom:1px solid var(--border);border-right:1px solid var(--border)}
+.fx-grid th:first-child,.fx-grid td:first-child{position:sticky;left:0;z-index:2;background:var(--accent);color:#fff;min-width:160px;max-width:200px;padding:7px 10px;font-size:12px;font-weight:500;white-space:nowrap;border-right:2px solid rgba(255,255,255,.3)}
+.fx-grid td:first-child{background:#f4f7fb;color:var(--text);font-size:13px;font-weight:500;border-right:2px solid var(--border)}
+.fx-grid td:first-child.orphan-row{background:var(--red-bg);color:var(--red);font-weight:600}
+.fx-grid th.floor-th{background:var(--accent);color:#fff;min-width:48px;width:64px;vertical-align:top;padding:6px 4px}
+.fx-grid th.total-th{background:#0f2a52;color:#fff;min-width:80px;padding:7px 10px;font-size:12px;font-weight:700;white-space:nowrap;position:sticky;right:0;z-index:2;border-left:2px solid rgba(255,255,255,.3)}
+.fx-grid td.total-cell{background:#e8eef8;font-family:var(--mono);text-align:right;padding:6px 10px;font-size:13px;font-weight:600;position:sticky;right:0;border-left:2px solid var(--border)}
+.fx-grid td.total-cell.zero{color:var(--text-muted);font-weight:400}
+.floor-th-inner{display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:4px}
+.floor-th-name{border:none;background:transparent;color:#fff;font-family:var(--sans);font-size:12px;font-weight:700;width:1.2em;padding:2px 0;border-radius:3px;text-align:center;writing-mode:vertical-rl;text-orientation:upright;letter-spacing:0.05em;height:auto}
+.floor-th-name:focus{outline:none;background:rgba(255,255,255,.2)}
+.floor-th-btns{display:flex;justify-content:center}
+.floor-th-del{background:rgba(220,60,60,.7);border:none;color:#fff;border-radius:3px;font-size:10px;padding:2px 4px;cursor:pointer;line-height:1.4;writing-mode:horizontal-tb}
+.floor-th-del:hover{background:rgba(220,60,60,1)}
+.fx-grid td.count-cell{padding:3px;text-align:center;min-width:0;width:64px}
+.fx-grid td.count-cell input{width:52px;text-align:center;font-family:var(--mono);font-size:13px;padding:5px 2px;border:1px solid var(--border);border-radius:5px;background:#fff}
+.fx-grid td.count-cell input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 2px rgba(26,58,107,.1)}
+.fx-grid td.count-cell.orphan-cell input{background:var(--red-bg);border-color:#f0c0c0}
+.fx-grid tr.summary-row td{background:#e8eef8;border-top:2px solid var(--accent);font-family:var(--mono);font-size:12px;text-align:right;padding:5px 10px;font-weight:600}
+.fx-grid tr.summary-row td:first-child{font-family:var(--sans);font-size:11px;color:var(--text-muted);text-align:left;font-weight:500}
+.fx-grid tr.wu-row td{background:#f0f4f8;font-family:var(--mono);font-size:11px;text-align:right;padding:3px 10px;color:var(--accent);font-weight:500}
+.fx-grid tr.wu-row td:first-child{font-family:var(--sans);font-size:11px;color:var(--text-muted);text-align:left}
+.fx-grid tr:hover td:not([class*="total"]):not(:first-child){background:var(--accent-pale)}
+.fx-grid tr.summary-row:hover td,.fx-grid tr.wu-row:hover td{background:inherit}
+.grid-add-btn{margin-top:8px}
+/* PC: 器具入力＋結果を横並び */
+@media(min-width:801px){
+  .sp-only{display:none!important}
+  .pc-columns{display:flex;gap:16px;align-items:flex-start}
+  .pc-columns>div:first-child{flex:1 1 0;min-width:0}
+  .pc-columns>div:last-child{flex:0 0 450px;width:450px;min-width:320px}
+  /* 設定・マニュアルは全幅で pc-columns を置き換えて表示 */
+  .pc-overlay{display:none}
+  .pc-overlay.active{display:block}
+}
+</style>
+</head>
+<body>
+<nav class="nav">
+  <div class="nav-inner">
+    <div class="nav-title">瞬時最大給水流量</div>
+    <!-- PC用タブ（広い画面） -->
+    <button class="tab-btn pc-only active" data-tab="__main__" onclick="showTab('__main__')">器具入力・結果</button>
+    <button class="tab-btn pc-only" data-tab="tab-fixture" onclick="showTab('tab-fixture')">設定</button>
+    <button class="tab-btn pc-only" data-tab="tab-manual" onclick="showTab('tab-manual')">マニュアル</button>
+    <!-- スマホ用タブ（狭い画面） -->
+    <button class="tab-btn sp-only active" data-tab="tab-floor" onclick="showTab('tab-floor')">器具入力</button>
+    <button class="tab-btn sp-only" data-tab="tab-result" onclick="showTab('tab-result')">結果</button>
+    <button class="tab-btn sp-only" data-tab="tab-fixture" onclick="showTab('tab-fixture')">設定</button>
+    <button class="tab-btn sp-only" data-tab="tab-manual" onclick="showTab('tab-manual')">マニュアル</button>
+  </div>
+</nav>
+<div class="main">
+
+<div class="pc-columns">
+<!-- ===== 器具入力 ===== -->
+<div id="tab-floor">
+  <div class="card">
+    <div class="card-title">エリア管理</div>
+    <div class="form-row">
+      <button class="btn btn-primary" onclick="addFloor()">＋ エリア追加</button>
+      <button class="btn btn-danger btn-sm" onclick="clearAllFloors()">全エリアクリア</button>
+    </div>
+    <div class="io-row" style="margin-top:8px">
+      <button class="btn btn-secondary btn-sm" onclick="exportFloors()">📥 JSON出力</button>
+      <button class="btn btn-secondary btn-sm" onclick="exportCSV()">📊 CSV出力</button>
+      <label class="btn btn-secondary btn-sm" style="cursor:pointer">📤 JSON読込<input type="file" accept=".json" style="display:none" onchange="importFloors(event)"></label>
+      <button class="btn btn-success btn-sm" onclick="loadSample()">📋 サンプルデータ読込</button>
+    </div>
+  </div>
+  <div id="master-toast" style="display:none" class="note"></div>
+  <div id="floor-list"></div>
+</div>
+
+<!-- ===== 結果 ===== -->
+<div id="tab-result">
+  <div class="card">
+    <div class="card-title">エリア別 負荷単位集計</div>
+    <div class="tbl-wrap">
+      <table class="result-tbl">
+        <thead><tr><th class="left label">エリア</th><th>公衆用 WU合計</th><th>私室用 WU合計</th></tr></thead>
+        <tbody id="result-floor-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-title">瞬時最大給水流量</div>
+    <div class="tbl-wrap">
+      <table class="flow-table result-tbl">
+        <thead><tr><th class="left label"></th><th>公衆用</th><th>私室用</th></tr></thead>
+        <tbody id="result-flow-tbody"></tbody>
+      </table>
+    </div>
+    <div class="note" style="margin-top:12px">洗浄弁多い場合／洗浄タンク多い場合のいずれを採用するかは設計者の判断によります。</div>
+    <div class="note" style="margin-top:8px">本ツールのHunter曲線はSHASE-S206に基づきます。各水道局が独自の早見表を公開している場合は、所轄水道局の基準に従って流量を読み取ってください。</div>
+  </div>
+  <div class="card">
+    <div class="card-title">器具別集計</div>
+    <div class="tbl-wrap">
+      <table style="min-width:420px">
+        <thead>
+          <tr><th class="left" rowspan="2">器具名</th><th rowspan="2">台数</th><th colspan="2">公衆用</th><th colspan="2">私室用</th></tr>
+          <tr><th>原単位 (WU/台)</th><th>WU合計</th><th>原単位 (WU/台)</th><th>WU合計</th></tr>
+        </thead>
+        <tbody id="result-fixture-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+</div><!-- /pc-columns -->
+
+<!-- ===== 器具設定 ===== -->
+<div id="tab-fixture" class="pc-overlay" style="display:none">
+  <div class="card" id="master-manage-card">
+    <div class="card-title" id="master-manage-title">器具マスタ管理</div>
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+      <span class="master-name-badge" id="master-name-badge">SHASE</span>
+      <span class="master-status-badge" id="master-status-badge" style="display:none">未保存</span>
+    </div>
+    <div class="master-btn-group" style="margin-top:10px">
+      <button class="btn btn-secondary btn-sm" onclick="openMasterListModal()">📂 読込</button>
+      <button class="btn btn-primary btn-sm" id="btn-save-master" onclick="saveMaster()">💾 上書き保存</button>
+      <button class="btn btn-secondary btn-sm" onclick="saveAsMaster()">💾 別名保存</button>
+    </div>
+    <div class="master-btn-group">
+      <label class="btn btn-secondary btn-sm" style="cursor:pointer">📤 JSON読込<input type="file" accept=".json" style="display:none" onchange="importMasterJSON(event)"></label>
+      <button class="btn btn-secondary btn-sm" onclick="exportMasterJSON()">📥 JSON保存</button>
+    </div>
+    <div class="note" style="margin-top:4px">※ マスタを切り替えると、新マスタに存在しない器具は赤字表示されWU計算から除外されます。未保存の場合は「別名保存」で保存してください。<br>※ 各マスタの器具名は原典の表記に基づいています。マスタ間で同一器具でも名称が異なる場合があります。</div>
+  </div>
+  <div class="card">
+    <div class="card-title">
+      器具リスト
+      <button class="btn btn-primary btn-sm" onclick="openAddFixtureModal()" style="margin-left:auto">＋ 器具追加</button>
+    </div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th class="left">器具名</th><th>公衆用 WU</th><th>私室用 WU</th><th></th></tr></thead>
+        <tbody id="fixture-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-title">ハンター曲線（参照）</div>
+    <div class="sub-tabs">
+      <div class="sub-tab active" onclick="showHunterTab('valve',this)">洗浄弁系</div>
+      <div class="sub-tab" onclick="showHunterTab('tank',this)">タンク系</div>
+    </div>
+    <div id="hunter-valve" class="tbl-wrap">
+      <table><thead><tr><th>負荷単位 (WU)</th><th>流量 (L/min)</th></tr></thead><tbody id="hunter-valve-body"></tbody></table>
+    </div>
+    <div id="hunter-tank" class="tbl-wrap" style="display:none">
+      <table><thead><tr><th>負荷単位 (WU)</th><th>流量 (L/min)</th></tr></thead><tbody id="hunter-tank-body"></tbody></table>
+    </div>
+    <div class="note">出典：SHASE-S206（図5.56）。WU≦10はHunter原典値、WU=11〜250は拡大図(b)、WU&gt;250は全体図(a)読み取り。区分線形補間により算出。</div>
+  </div>
+</div><!-- /tab-fixture -->
+
+<!-- ===== マニュアル ===== -->
+<div id="tab-manual" class="pc-overlay" style="display:none">
+  <div class="card">
+    <div class="manual-section">
+      <h3>ツール概要</h3>
+      <p>給水負荷単位（WU: Water Unit）法に基づき、建物の瞬時最大給水流量を算定するツールです。器具の台数をエリアごとに入力し、ハンター曲線を用いて瞬時最大給水流量（L/min）を求めます。公衆用・私室用の区分で別々に算定し、洗浄弁多い場合・洗浄タンク多い場合の両曲線の結果を表示します。</p>
+    </div>
+    <div class="manual-section">
+      <h3>操作手順</h3>
+      <ul>
+        <li><strong>器具入力</strong>：エリアを追加し、各エリアのアコーディオンを開いて器具台数を入力します。＋/－ボタンまたは直接数値入力が可能です。</li>
+        <li><strong>結果</strong>：エリア別WU集計・瞬時最大給水流量（公衆用/私室用 × 洗浄弁系/タンク系）・器具別集計を確認します。</li>
+        <li><strong>設定</strong>：器具マスタの確認・編集、ハンター曲線テーブルの参照を行います。</li>
+        <li><strong>JSON出力／読込</strong>：器具入力エリアのJSON出力でエリアデータを保存、読込で復元できます。</li>
+        <li><strong>サンプルデータ読込</strong>：オフィスビル5エリアのサンプルデータを読み込みます。</li>
+      </ul>
+    </div>
+    <div class="manual-section">
+      <h3>計算フロー</h3>
+      <ul>
+        <li>各器具の台数 × 負荷単位（WU/台）＝ 器具の WU</li>
+        <li>全エリア・全器具の WU を合計（公衆用・私室用それぞれ）</li>
+        <li>合計 WU をハンター曲線に入力 → 瞬時最大給水流量（L/min）</li>
+      </ul>
+      <div class="formula-box">
+        合計WU（公衆用） = Σ（器具i の 公衆用WU × 台数i）<br>
+        合計WU（私室用） = Σ（器具i の 私室用WU × 台数i）　※ 私室用なし器具は除く<br>
+        瞬時最大給水流量（洗浄弁多い場合） = HunterCurve1（合計WU）　[L/min]<br>
+        瞬時最大給水流量（タンク多い場合） = HunterCurve2（合計WU）　[L/min]
+      </div>
+    </div>
+    <div class="manual-section">
+      <h3>ハンター曲線（区分線形補間）</h3>
+      <p>SHASE-S206（図5.56）に基づく区分線形補間テーブルを使用します。WU≦10はHunter原典値、WU=11〜250は拡大図(b)、WU=250超は全体図(a)から読み取った値です。テーブル範囲外（WU&gt;3000）は末尾2点から線形外挿します。</p>
+      <div class="formula-box">
+        WU が x1 ≤ WU ≤ x2 の区間にある場合：<br>
+        Q = Q1 + (WU − x1) × (Q2 − Q1) / (x2 − x1)
+      </div>
+      <p>各水道局が独自のHunter曲線早見表を公開している場合があります。所轄水道局の指針がある場合は、本ツールの算定値を参考値として、所轄水道局の基準に従って流量を読み取ってください。</p>
+    </div>
+    <div class="manual-section">
+      <h3>器具マスタ管理</h3>
+      <ul>
+        <li>SHASE・京都市水道局・大阪市水道局は組み込みマスタ（🔒）。削除・上書き不可、読込のみ可能</li>
+        <li>「別名保存」で現在の器具リストに名前をつけてlocalStorageに保存。複数作成可能</li>
+        <li>「上書き保存」はカスタムマスタへの上書き（組み込みマスタには使用不可）</li>
+        <li>未保存状態では「未保存」バッジが表示され、カードが青枠になります</li>
+        <li>「📂 読込」ボタンのマスタ一覧モーダルでカスタムマスタのロード・リネーム・削除が可能</li>
+        <li>JSON出力/読込でブラウザやPC間のマスタ移行が可能</li>
+      </ul>
+    </div>
+    <div class="manual-section">
+      <h3>孤立器具について</h3>
+      <p>マスタを切り替えた際、新マスタに存在しない器具は<span style="color:var(--red);font-weight:600">赤字</span>で「マスタ未登録・WU除外」と表示され、WU計算から除外されます。「置き換え」ボタンで現在のマスタの器具に置き換えるか、新規器具として追加できます。</p>
+    </div>
+    <div class="manual-section">
+      <h3>器具負荷単位（SHASE基準値）</h3>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th class="left">器具名</th><th>公衆用 WU</th><th>私室用 WU</th></tr></thead>
+          <tbody id="manual-fixture-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="manual-section">
+      <h3>注意事項</h3>
+      <ul>
+        <li>洗浄弁多い場合／洗浄タンク多い場合のいずれを採用するかは設計者の判断によります</li>
+        <li>ハンター曲線はグラフ読み取り値のため、±数L/min程度の誤差があります。精密設計時はSHASE-S206数表との照合を行ってください</li>
+        <li>本ツールの計算値は一般設計用途を目的としています</li>
+      </ul>
+    </div>
+    <div class="manual-section">
+      <h3>参考規格</h3>
+      <ul>
+        <li>SHASE-S206：給排水衛生設備規準・同解説（空気調和・衛生工学会）</li>
+        <li>京都市水道局：給水装置工事設計施工指針（表9 給水用具給水負荷単位表）</li>
+        <li>大阪市水道局：水道施設設計指針（表2-19 給水用具給水負荷単位）</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+</div><!-- /main -->
+
+<!-- MODAL: 器具追加・編集 -->
+<div class="modal-overlay hidden" id="fixture-modal">
+  <div class="modal">
+    <div class="modal-title" id="fixture-modal-title">器具を追加</div>
+    <div class="form-group" style="margin-bottom:10px">
+      <label class="form-label">器具名</label>
+      <input type="text" id="fi-name" placeholder="例：洗面器">
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+      <div class="form-group"><label class="form-label">公衆用 WU</label><input type="number" id="fi-pub" min="0" step="0.5" inputmode="decimal" placeholder="空欄=－"></div>
+      <div class="form-group"><label class="form-label">私室用 WU</label><input type="number" id="fi-pri" min="0" step="0.5" inputmode="decimal" placeholder="空欄=－"></div>
+    </div>
+    <div class="form-group" style="margin-bottom:10px">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+        <input type="checkbox" id="fi-no-pri">
+        <span class="form-label">私室用なし（－表示）</span>
+      </label>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeFixtureModal()">キャンセル</button>
+      <button class="btn btn-primary" onclick="saveFixture()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: 孤立器具の置き換え -->
+<div class="modal-overlay hidden" id="replace-modal">
+  <div class="modal">
+    <div class="modal-title">器具の置き換え</div>
+    <div class="modal-body" style="margin-bottom:12px">
+      <span style="color:var(--red);font-weight:600" id="replace-orphan-name"></span> をマスタの器具に置き換えます。<br>
+      <span style="font-size:12px;color:var(--text-muted)">※ 全エリアの該当器具をまとめて置き換えます。</span>
+    </div>
+    <div class="form-group" style="margin-bottom:12px">
+      <label class="form-label">置き換え先</label>
+      <select id="replace-target-select" onchange="onReplaceTargetChange()"></select>
+    </div>
+    <div id="replace-new-area" style="display:none;border:1px solid var(--border);border-radius:6px;padding:12px;margin-bottom:12px;background:var(--bg)">
+      <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px">新規器具として追加するWU値を入力してください</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:8px">
+        <div class="form-group"><label class="form-label">公衆用 WU</label><input type="number" id="replace-pub" min="0" step="0.5" inputmode="decimal" placeholder="空欄=－"></div>
+        <div class="form-group"><label class="form-label">私室用 WU</label><input type="number" id="replace-pri" min="0" step="0.5" inputmode="decimal" placeholder="空欄=－"></div>
+      </div>
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px">
+        <input type="checkbox" id="replace-no-pri">
+        <span class="form-label">私室用なし（－表示）</span>
+      </label>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeReplaceModal()">キャンセル</button>
+      <button class="btn btn-primary" onclick="confirmReplace()">置き換え</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: マスタ一覧 -->
+<div class="modal-overlay hidden" id="master-list-modal">
+  <div class="modal" style="max-width:520px">
+    <div class="modal-title">器具マスタ ロード</div>
+    <div class="master-list" id="master-list-items"></div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeMasterListModal()">閉じる</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: 別名保存 -->
+<div class="modal-overlay hidden" id="saveas-modal">
+  <div class="modal">
+    <div class="modal-title">別名保存</div>
+    <div class="form-group" style="margin-bottom:16px">
+      <label class="form-label">マスタ名</label>
+      <input type="text" id="saveas-name" placeholder="例：○○プロジェクト用">
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeSaveAsModal()">キャンセル</button>
+      <button class="btn btn-primary" onclick="confirmSaveAs()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: 汎用確認 -->
+<div class="modal-overlay hidden" id="confirm-modal">
+  <div class="modal">
+    <div class="modal-title" id="confirm-title">確認</div>
+    <div class="modal-body" id="confirm-msg"></div>
+    <div class="modal-actions" id="confirm-actions"></div>
+  </div>
+</div>
+
+<script>
+// ===== Hunter curves =====
+// SHASE-S206（図5.56）読み取り値。WU≦10はHunter原典値を維持、WU=11〜250は(b)拡大図、WU=250超は(a)全体図から読み取り。
+const HUNTER_VALVE=[[0,0],[1,25],[2,35],[3,42],[4,48],[5,53],[6,58],[7,62],[8,66],[9,69],[10,72],[15,95],[20,115],[25,130],[30,145],[40,170],[50,192],[60,210],[70,228],[80,244],[90,258],[100,272],[120,296],[140,317],[160,336],[180,353],[200,369],[250,402],[300,430],[400,490],[500,545],[600,595],[700,640],[800,683],[900,725],[1000,765],[1250,860],[1500,950],[2000,1125],[2500,1290],[3000,1460]];
+const HUNTER_TANK=[[0,0],[1,14],[2,18],[3,22],[4,25],[5,28],[6,30],[7,33],[8,35],[9,37],[10,39],[15,54],[20,67],[25,78],[30,88],[40,107],[50,123],[60,137],[70,150],[80,162],[90,173],[100,183],[120,201],[140,217],[160,232],[180,246],[200,258],[250,285],[300,310],[400,355],[500,397],[600,435],[700,470],[800,503],[900,535],[1000,565],[1250,635],[1500,700],[2000,820],[2500,930],[3000,1035]];
+
+function hunterInterp(table,wu){
+  if(wu<=0)return 0;
+  const last=table[table.length-1];
+  if(wu>=last[0]){const n=table.length,[x1,y1]=table[n-2],[x2,y2]=table[n-1];return y2+(wu-x2)*(y2-y1)/(x2-x1);}
+  for(let i=1;i<table.length;i++){if(wu<=table[i][0]){const[x1,y1]=table[i-1],[x2,y2]=table[i];return y1+(wu-x1)*(y2-y1)/(x2-x1);}}
+  return 0;
+}
+
+// ===== 組み込みマスタ =====
+const BUILTIN_MASTERS=[
+  {id:'shase',type:'builtin',name:'SHASE（空気調和・衛生工学会）',fixtures:[
+    {name:"大便器（洗浄弁）",      pubWU:10, priWU:6,   noPri:false},
+    {name:"大便器（洗浄タンク）",  pubWU:5,  priWU:3,   noPri:false},
+    {name:"小便器（洗浄弁）",      pubWU:5,  priWU:null,noPri:true},
+    {name:"小便器（洗浄タンク）",  pubWU:3,  priWU:null,noPri:true},
+    {name:"洗面器",                pubWU:2,  priWU:1,   noPri:false},
+    {name:"手洗器",                pubWU:1,  priWU:0.5, noPri:false},
+    {name:"医療用洗面器",          pubWU:3,  priWU:null,noPri:true},
+    {name:"事務室用流し",          pubWU:3,  priWU:null,noPri:true},
+    {name:"台所流し",              pubWU:null,priWU:3,  noPri:false},
+    {name:"料理場流し（給水栓）",  pubWU:4,  priWU:2,   noPri:false},
+    {name:"料理場流し（混合栓）",  pubWU:3,  priWU:null,noPri:true},
+    {name:"食器洗流し",            pubWU:5,  priWU:null,noPri:true},
+    {name:"連合流し",              pubWU:null,priWU:3,  noPri:false},
+    {name:"洗面流し（水栓1個）",   pubWU:2,  priWU:null,noPri:true},
+    {name:"掃除用流し",            pubWU:4,  priWU:3,   noPri:false},
+    {name:"浴槽",                  pubWU:4,  priWU:2,   noPri:false},
+    {name:"シャワー",              pubWU:4,  priWU:2,   noPri:false},
+    {name:"浴室一そろい（洗浄弁）",pubWU:null,priWU:8,  noPri:false},
+    {name:"浴室一そろい（洗浄タンク）",pubWU:null,priWU:6,noPri:false},
+    {name:"水飲器",                pubWU:2,  priWU:1,   noPri:false},
+    {name:"湯沸し器",              pubWU:2,  priWU:null,noPri:true},
+    {name:"散水・車庫",            pubWU:5,  priWU:null,noPri:true},
+  ]},
+  {id:'kyoto',type:'builtin',name:'京都市水道局',fixtures:[
+    {name:"大便器（洗浄弁）",              pubWU:10, priWU:6,   noPri:false},
+    {name:"大便器（洗浄タンク）",          pubWU:5,  priWU:3,   noPri:false},
+    {name:"大便器（洗浄弁・タンク併用型）",pubWU:null,priWU:4.5,noPri:false},
+    {name:"小便器（洗浄弁）",              pubWU:5,  priWU:null,noPri:true},
+    {name:"小便器（洗浄タンク）",          pubWU:3,  priWU:null,noPri:true},
+    {name:"洗面器",                        pubWU:2,  priWU:1,   noPri:false},
+    {name:"手洗器",                        pubWU:1,  priWU:0.5, noPri:false},
+    {name:"医療用洗面器",                  pubWU:3,  priWU:null,noPri:true},
+    {name:"事務室用流し",                  pubWU:3,  priWU:null,noPri:true},
+    {name:"台所流し",                      pubWU:null,priWU:3,  noPri:false},
+    {name:"料理場流し（給水栓）",          pubWU:4,  priWU:2,   noPri:false},
+    {name:"料理場流し（混合栓）",          pubWU:3,  priWU:null,noPri:true},
+    {name:"食器洗流し",                    pubWU:5,  priWU:null,noPri:true},
+    {name:"連合流し",                      pubWU:null,priWU:3,  noPri:false},
+    {name:"洗面流し（水栓1個）",           pubWU:2,  priWU:null,noPri:true},
+    {name:"掃除用流し",                    pubWU:4,  priWU:3,   noPri:false},
+    {name:"浴槽",                          pubWU:4,  priWU:2,   noPri:false},
+    {name:"シャワー",                      pubWU:4,  priWU:2,   noPri:false},
+    {name:"浴室一そろい（大便器が洗浄弁）",    pubWU:null,priWU:8,  noPri:false},
+    {name:"浴室一そろい（大便器が洗浄タンク）",pubWU:null,priWU:6,  noPri:false},
+    {name:"水飲み器",                      pubWU:2,  priWU:1,   noPri:false},
+    {name:"湯沸し器（ボールタップ）",      pubWU:2,  priWU:null,noPri:true},
+    {name:"散水・車庫",                    pubWU:5,  priWU:null,noPri:true},
+  ]},
+  {id:'osaka',type:'builtin',name:'大阪市水道局',fixtures:[
+    {name:"大便器（洗浄弁）",              pubWU:10, priWU:6,   noPri:false},
+    {name:"大便器（洗浄タンク）",          pubWU:5,  priWU:3,   noPri:false},
+    {name:"小便器（洗浄弁）",              pubWU:5,  priWU:null,noPri:true},
+    {name:"小便器（洗浄タンク）",          pubWU:3,  priWU:null,noPri:true},
+    {name:"洗面器",                        pubWU:2,  priWU:1,   noPri:false},
+    {name:"手面器",                        pubWU:1,  priWU:0.5, noPri:false},
+    {name:"医療用洗面器",                  pubWU:3,  priWU:null,noPri:true},
+    {name:"事務室用流し",                  pubWU:3,  priWU:null,noPri:true},
+    {name:"台所流し",                      pubWU:null,priWU:3,  noPri:false},
+    {name:"料理場流し（給水栓）",          pubWU:4,  priWU:2,   noPri:false},
+    {name:"料理場流し（混合栓）",          pubWU:3,  priWU:null,noPri:true},
+    {name:"食器洗流し",                    pubWU:5,  priWU:null,noPri:true},
+    {name:"連合流し",                      pubWU:null,priWU:3,  noPri:false},
+    {name:"洗面流し（水栓1個）",           pubWU:2,  priWU:null,noPri:true},
+    {name:"掃除用流し",                    pubWU:4,  priWU:3,   noPri:false},
+    {name:"浴槽",                          pubWU:4,  priWU:2,   noPri:false},
+    {name:"シャワー",                      pubWU:4,  priWU:2,   noPri:false},
+    {name:"浴室一そろい（大便器が洗浄弁）",    pubWU:null,priWU:8,  noPri:false},
+    {name:"浴室一そろい（大便器が洗浄タンク）",pubWU:null,priWU:6,  noPri:false},
+    {name:"水飲み器",                      pubWU:2,  priWU:1,   noPri:false},
+    {name:"湯沸し器（ボールタップ）",      pubWU:2,  priWU:null,noPri:true},
+    {name:"散水・車庫",                    pubWU:5,  priWU:null,noPri:true},
+  ]},
+];
+
+const LS_MASTERS='wc_masters';
+const LS_ACTIVE='wc_active_master_id';
+
+const SAMPLE_DATA={
+  floors:[
+    {id:"s1",name:"1F（エントランス・共用）",counts:{"大便器（洗浄弁）":2,"小便器（洗浄弁）":4,"洗面器":4,"掃除用流し":2}},
+    {id:"s2",name:"2F（執務室）",            counts:{"大便器（洗浄弁）":2,"小便器（洗浄弁）":2,"洗面器":4,"掃除用流し":1}},
+    {id:"s3",name:"3F（執務室）",            counts:{"大便器（洗浄弁）":2,"小便器（洗浄弁）":2,"洗面器":4,"掃除用流し":1}},
+    {id:"s4",name:"4F（執務室）",            counts:{"大便器（洗浄弁）":2,"小便器（洗浄弁）":2,"洗面器":4,"掃除用流し":1}},
+    {id:"s5",name:"5F（役員・会議室）",      counts:{"大便器（洗浄弁）":1,"大便器（洗浄タンク）":1,"小便器（洗浄弁）":2,"小便器（洗浄タンク）":1,"洗面器":3,"掃除用流し":1}},
+  ]
+};
+
+// ===== 名前正規化 =====
+function normName(s){return s.replace(/\s/g,'').replace(/（/g,'(').replace(/）/g,')').replace(/　/g,'').toLowerCase();}
+
+// ===== State =====
+let fixtures=[];
+let floors=[{id:uid(),name:"1F",counts:{}}];
+let activeMasterId='shase';
+let masterDirty=false;
+let dirtyFixtures=new Map(); // idx -> 'add'|'edit'
+let deletedCount=0;
+let editingFixtureIdx=-1;
+
+function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,6);}
+function hasFloorData(){return floors.some(f=>Object.values(f.counts).some(v=>v>0));}
+function isOrphan(name){const n=normName(name);return !fixtures.some(fx=>normName(fx.name)===n);}
+function isBuiltin(id){return BUILTIN_MASTERS.some(m=>m.id===id);}
+
+// ===== localStorage =====
+function loadCustomMasters(){try{const d=localStorage.getItem(LS_MASTERS);return d?JSON.parse(d):[];}catch(e){return [];}}
+function saveCustomMasters(list){try{localStorage.setItem(LS_MASTERS,JSON.stringify(list));}catch(e){}}
+function getAllMasters(){return [...BUILTIN_MASTERS,...loadCustomMasters()];}
+function getMasterById(id){return getAllMasters().find(m=>m.id===id)||null;}
+function saveActiveId(id){try{localStorage.setItem(LS_ACTIVE,id);}catch(e){}}
+function loadActiveId(){try{return localStorage.getItem(LS_ACTIVE)||'shase';}catch(e){return 'shase';}}
+
+// ===== マスタ適用 =====
+function applyMaster(id,keepCounts){
+  const master=getMasterById(id);
+  if(!master)return;
+  activeMasterId=id;
+  masterDirty=false;
+  dirtyFixtures=new Map();
+  deletedCount=0;
+  fixtures=JSON.parse(JSON.stringify(master.fixtures));
+  if(!keepCounts)floors.forEach(f=>f.counts={});
+  saveActiveId(id);
+  renderMasterBar();
+  renderFixtureTable();
+  renderFloors();
+}
+
+function markDirty(){masterDirty=true;renderMasterBar();}
+
+function renderMasterBar(){
+  const master=getMasterById(activeMasterId);
+  const name=master?master.name:'（未保存マスタ）';
+  const dirty=masterDirty;
+  const builtin=isBuiltin(activeMasterId);
+
+  const badge=document.getElementById('master-name-badge');
+  badge.textContent=name;
+  badge.className='master-name-badge'+(dirty?' unsaved':'');
+
+  const statusBadge=document.getElementById('master-status-badge');
+  statusBadge.style.display=dirty?'':'none';
+
+  const card=document.getElementById('master-manage-card');
+  card.className='card'+(dirty?' unsaved':'');
+
+  const title=document.getElementById('master-manage-title');
+  title.className='card-title'+(dirty?' unsaved':'');
+  title.textContent='器具マスタ管理'+(dirty?' （未保存）':'');
+
+  const btn=document.getElementById('btn-save-master');
+  btn.disabled=builtin;
+  btn.title=builtin?'組み込みマスタは上書き保存できません。「別名保存」を使用してください。':'';
+}
+
+// ===== マスタ保存 =====
+function saveMaster(){
+  if(isBuiltin(activeMasterId))return;
+  const list=loadCustomMasters();
+  const idx=list.findIndex(m=>m.id===activeMasterId);
+  if(idx<0)return;
+  list[idx].fixtures=JSON.parse(JSON.stringify(fixtures));
+  saveCustomMasters(list);
+  masterDirty=false;
+  dirtyFixtures=new Map();
+  deletedCount=0;
+  renderMasterBar();
+  renderFixtureTable();
+  showMasterToast('マスタを保存しました。');
+}
+
+function saveAsMaster(){
+  const master=getMasterById(activeMasterId);
+  document.getElementById('saveas-name').value=master?master.name+'（コピー）':'';
+  document.getElementById('saveas-modal').classList.remove('hidden');
+  setTimeout(()=>{const el=document.getElementById('saveas-name');el.focus();el.select();},50);
+}
+
+function closeSaveAsModal(){
+  document.getElementById('saveas-modal').classList.add('hidden');
+  const errEl=document.getElementById('saveas-name');
+  errEl.style.borderColor='';errEl.style.boxShadow='';
+  const msg=document.getElementById('saveas-err');
+  if(msg)msg.remove();
+}
+
+function confirmSaveAs(){
+  const name=document.getElementById('saveas-name').value.trim();
+  if(!name){alert('マスタ名を入力してください');return;}
+  // 同名チェック
+  const dup=getAllMasters().find(m=>m.name===name);
+  if(dup){
+    const errEl=document.getElementById('saveas-name');
+    errEl.style.borderColor='var(--red)';
+    errEl.style.boxShadow='0 0 0 3px rgba(139,26,26,.15)';
+    let msg=document.getElementById('saveas-err');
+    if(!msg){msg=document.createElement('div');msg.id='saveas-err';msg.style.cssText='font-size:12px;color:var(--red);margin-top:6px';errEl.parentNode.appendChild(msg);}
+    msg.textContent=`「${name}」は既に存在します。別の名前を入力してください。`;
+    return;
+  }
+  const newId=uid();
+  const list=loadCustomMasters();
+  list.push({id:newId,type:'custom',name,fixtures:JSON.parse(JSON.stringify(fixtures))});
+  saveCustomMasters(list);
+  activeMasterId=newId;
+  masterDirty=false;
+  dirtyFixtures=new Map();
+  deletedCount=0;
+  saveActiveId(newId);
+  closeSaveAsModal();
+  renderMasterBar();
+  renderFixtureTable();
+  showMasterToast(`「${name}」として保存しました。`);
+}
+
+// ===== マスタ一覧モーダル =====
+function openMasterListModal(){renderMasterListItems();document.getElementById('master-list-modal').classList.remove('hidden');}
+function closeMasterListModal(){document.getElementById('master-list-modal').classList.add('hidden');}
+
+function renderMasterListItems(){
+  const container=document.getElementById('master-list-items');
+  container.innerHTML='';
+  getAllMasters().forEach(master=>{
+    const isActive=master.id===activeMasterId;
+    const item=document.createElement('div');
+    item.className='master-item'+(isActive?' active-master':'');
+    if(master.type==='builtin'){
+      item.innerHTML=`<span class="master-item-name">${master.name}</span><span class="builtin-lock">🔒 組み込み</span><button class="btn btn-primary btn-sm" onclick="loadMasterFromList('${master.id}')">ロード</button>`;
+    }else{
+      item.innerHTML=`<span class="master-item-name"><input type="text" value="${master.name.replace(/"/g,'&quot;')}" onchange="renameMaster('${master.id}',this.value)" onclick="event.stopPropagation()"></span><button class="btn btn-primary btn-sm" onclick="loadMasterFromList('${master.id}')">ロード</button><button class="btn btn-danger btn-sm" onclick="deleteMasterFromList('${master.id}')">削除</button>`;
+    }
+    container.appendChild(item);
+  });
+}
+
+function loadMasterFromList(id){
+  const doLoad=()=>{applyMaster(id,true);closeMasterListModal();};
+  if(hasFloorData()){
+    showModal('マスタ切替','マスタを切り替えます。新マスタに存在しない器具は赤字表示され、WU計算から除外されます。続けますか？',
+      [{label:'キャンセル',cls:'btn-secondary',cb:closeModal},
+       {label:'切替実行',cls:'btn-primary',cb:()=>{closeModal();doLoad();}}
+      ]);
+  }else{doLoad();}
+}
+
+function renameMaster(id,newName){
+  const list=loadCustomMasters();
+  const m=list.find(m=>m.id===id);
+  if(!m)return;
+  m.name=newName.trim()||m.name;
+  saveCustomMasters(list);
+  if(id===activeMasterId)renderMasterBar();
+}
+
+function deleteMasterFromList(id){
+  const list=loadCustomMasters();
+  const m=list.find(m=>m.id===id);
+  if(!m)return;
+  showModal(`「${m.name}」を削除`,`カスタムマスタ「${m.name}」を削除しますか？`,
+    [{label:'キャンセル',cls:'btn-secondary',cb:closeModal},
+     {label:'削除',cls:'btn-danger',cb:()=>{
+       saveCustomMasters(list.filter(c=>c.id!==id));
+       if(activeMasterId===id){
+         activeMasterId='shase';masterDirty=false;
+         fixtures=JSON.parse(JSON.stringify(getMasterById('shase').fixtures));
+         saveActiveId('shase');
+         renderMasterBar();renderFixtureTable();renderFloors();
+       }
+       closeModal();renderMasterListItems();
+     }}
+    ]);
+}
+
+// ===== JSON マスタ出力/読込 =====
+function exportMasterJSON(){
+  const master=getMasterById(activeMasterId);
+  downloadJSON({type:'fixture-master',name:master?master.name:'',fixtures},'器具マスタ.json');
+}
+
+function importMasterJSON(e){
+  const file=e.target.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=ev=>{
+    try{
+      const data=JSON.parse(ev.target.result);
+      if(!data.fixtures||!Array.isArray(data.fixtures))throw new Error('形式エラー');
+      fixtures=data.fixtures;
+      activeMasterId='__imported__';
+      masterDirty=true;
+      dirtyFixtures=new Map();
+      deletedCount=0;
+      renderMasterBar();renderFixtureTable();renderFloors();
+      showMasterToast('器具マスタを読み込みました。「別名保存」で保存してください。');
+    }catch(err){alert('読込エラー：'+err.message);}
+  };
+  reader.readAsText(file);e.target.value='';
+}
+
+// ===== Tabs =====
+const PC=()=>window.innerWidth>800;
+function showTab(id){
+  if(PC()){
+    const showOverlay=(id==='tab-fixture'||id==='tab-manual');
+    document.querySelector('.pc-columns').style.display=showOverlay?'none':'flex';
+    document.querySelectorAll('.pc-overlay').forEach(el=>{
+      el.style.display=(el.id===id&&showOverlay)?'block':'none';
+    });
+    const activeId=showOverlay?id:'__main__';
+    document.querySelectorAll('.pc-only.tab-btn').forEach(b=>{
+      b.classList.toggle('active',b.dataset.tab===activeId);
+    });
+    if(!showOverlay)updateResult();
+    if(id==='tab-manual')renderManualFixtures();
+  }else{
+    ['tab-floor','tab-fixture','tab-result','tab-manual'].forEach(t=>{
+      document.getElementById(t).style.display=t===id?'':'none';
+    });
+    document.querySelectorAll('.sp-only.tab-btn').forEach(b=>{
+      b.classList.toggle('active',b.dataset.tab===id);
+    });
+    if(id==='tab-result')updateResult();
+    if(id==='tab-floor')renderFloors();
+    if(id==='tab-manual')renderManualFixtures();
+  }
+}
+
+// ===== Fixture table =====
+function renderFixtureTable(){
+  const tbody=document.getElementById('fixture-tbody');
+  tbody.innerHTML='';
+  fixtures.forEach((f,i)=>{
+    const tr=document.createElement('tr');
+    const dtype=dirtyFixtures.get(i);
+    if(dtype==='add')tr.className='fx-added';
+    else if(dtype==='edit')tr.className='fx-edited';
+    tr.innerHTML=`<td class="nowrap">${f.name}</td><td class="mono center">${f.pubWU??'－'}</td><td class="mono center">${f.noPri?'－':(f.priWU??'－')}</td><td style="white-space:nowrap"><button class="btn btn-secondary btn-sm" onclick="openEditFixtureModal(${i})">編集</button> <button class="btn btn-danger btn-sm" onclick="confirmDeleteFixture(${i})">削除</button></td>`;
+    tbody.appendChild(tr);
+  });
+  // 削除済み未保存メモ
+  let note=document.getElementById('fixture-deleted-note');
+  if(masterDirty&&deletedCount>0){
+    if(!note){note=document.createElement('div');note.id='fixture-deleted-note';note.className='fixture-deleted-note';document.getElementById('fixture-tbody').closest('.tbl-wrap').after(note);}
+    note.textContent=`※ 削除済み器具が ${deletedCount} 件あります（未保存）`;
+  }else{
+    if(note)note.remove();
+  }
+}
+
+function renderManualFixtures(){
+  const tbody=document.getElementById('manual-fixture-tbody');if(!tbody)return;
+  tbody.innerHTML='';
+  BUILTIN_MASTERS[0].fixtures.forEach(f=>{
+    tbody.innerHTML+=`<tr><td class="nowrap">${f.name}</td><td class="mono center">${f.pubWU??'－'}</td><td class="mono center">${f.noPri?'－':(f.priWU??'－')}</td></tr>`;
+  });
+}
+
+function renderHunterTables(){
+  const vb=document.getElementById('hunter-valve-body'),tb=document.getElementById('hunter-tank-body');
+  vb.innerHTML='';tb.innerHTML='';
+  HUNTER_VALVE.forEach(([wu,q])=>{vb.innerHTML+=`<tr><td class="mono center">${wu}</td><td class="mono center">${q.toFixed(1)}</td></tr>`;});
+  HUNTER_TANK.forEach(([wu,q])=>{tb.innerHTML+=`<tr><td class="mono center">${wu}</td><td class="mono center">${q.toFixed(1)}</td></tr>`;});
+}
+
+function showHunterTab(type,el){
+  document.getElementById('hunter-valve').style.display=type==='valve'?'':'none';
+  document.getElementById('hunter-tank').style.display=type==='tank'?'':'none';
+  document.querySelectorAll('.sub-tab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+}
+
+// ===== Fixture modal =====
+function openAddFixtureModal(){
+  editingFixtureIdx=-1;
+  document.getElementById('fixture-modal-title').textContent='器具を追加';
+  document.getElementById('fi-name').value='';
+  document.getElementById('fi-pub').value='';
+  document.getElementById('fi-pri').value='';
+  document.getElementById('fi-no-pri').checked=false;
+  document.getElementById('fixture-modal').classList.remove('hidden');
+}
+
+function openEditFixtureModal(i){
+  editingFixtureIdx=i;
+  const f=fixtures[i];
+  document.getElementById('fixture-modal-title').textContent='器具を編集';
+  document.getElementById('fi-name').value=f.name;
+  document.getElementById('fi-pub').value=f.pubWU??'';
+  document.getElementById('fi-pri').value=f.priWU??'';
+  document.getElementById('fi-no-pri').checked=f.noPri;
+  document.getElementById('fixture-modal').classList.remove('hidden');
+}
+
+function closeFixtureModal(){document.getElementById('fixture-modal').classList.add('hidden');}
+
+function saveFixture(){
+  const name=document.getElementById('fi-name').value.trim();
+  if(!name){alert('器具名を入力してください');return;}
+  const noPri=document.getElementById('fi-no-pri').checked;
+  const pub=document.getElementById('fi-pub').value;
+  const pri=document.getElementById('fi-pri').value;
+  const obj={name,pubWU:pub!==''?parseFloat(pub):null,priWU:(!noPri&&pri!=='')?parseFloat(pri):null,noPri};
+  if(editingFixtureIdx===-1){
+    fixtures.push(obj);
+    dirtyFixtures.set(fixtures.length-1,'add');
+  }else{
+    fixtures[editingFixtureIdx]=obj;
+    // 既に'add'なら'add'のまま維持、そうでなければ'edit'
+    if(dirtyFixtures.get(editingFixtureIdx)!=='add')dirtyFixtures.set(editingFixtureIdx,'edit');
+  }
+  markDirty();
+  closeFixtureModal();renderFixtureTable();renderFloors();
+}
+
+function confirmDeleteFixture(i){
+  showModal(`「${fixtures[i].name}」を削除`,`器具「${fixtures[i].name}」を削除しますか？`,
+    [{label:'キャンセル',cls:'btn-secondary',cb:closeModal},
+     {label:'削除',cls:'btn-danger',cb:()=>{
+       const name=fixtures[i].name;
+       const wasAdded=dirtyFixtures.get(i)==='add';
+       fixtures.splice(i,1);
+       floors.forEach(f=>{delete f.counts[name];});
+       // dirtyFixturesのindexを再マッピング
+       const newMap=new Map();
+       dirtyFixtures.forEach((type,idx)=>{
+         if(idx<i)newMap.set(idx,type);
+         else if(idx>i)newMap.set(idx-1,type);
+         // idx===i は削除なので除外
+       });
+       dirtyFixtures=newMap;
+       // 新規追加した器具を削除した場合はdeletedCountを増やさない
+       if(!wasAdded)deletedCount++;
+       markDirty();
+       renderFixtureTable();renderFloors();closeModal();
+     }}
+    ]);
+}
+
+// ===== Floors =====
+function floorHasOrphan(floor){return Object.entries(floor.counts).some(([n,c])=>c>0&&isOrphan(n));}
+
+function renderFloors(){
+  if(PC()) renderFloorGrid();
+  else renderFloorAccordion();
+}
+
+function renderFloorAccordion(){
+  const container=document.getElementById('floor-list');
+  container.innerHTML='';
+  floors.forEach((floor,fi)=>{
+    const hasOrphan=floorHasOrphan(floor);
+    const div=document.createElement('div');
+    div.className='floor-card'+(hasOrphan?' has-orphan':'');
+    const warnBadge=hasOrphan?`<span class="floor-warn" id="floor-warn-${fi}">⚠ 未登録器具あり</span>`:`<span id="floor-warn-${fi}"></span>`;
+    div.innerHTML=`<div class="floor-header" onclick="toggleFloor(${fi},event)"><input class="floor-name-input" value="${floor.name}" onclick="event.stopPropagation()" onchange="floors[${fi}].name=this.value;updateFloorWU(${fi})">${warnBadge}<span class="floor-wu-summary" id="floor-wu-${fi}"></span><span class="floor-chevron" id="floor-chev-${fi}">▼</span><button class="btn btn-danger btn-sm" onclick="event.stopPropagation();confirmDeleteFloor(${fi})" style="margin-left:4px">削除</button></div><div class="floor-body" id="floor-body-${fi}"><div class="fixture-rows" id="floor-fixtures-${fi}"></div></div>`;
+    container.appendChild(div);
+    renderFloorFixtures(fi);updateFloorWU(fi);
+  });
+}
+
+function renderFloorGrid(){
+  const container=document.getElementById('floor-list');
+  container.innerHTML='';
+
+  // 孤立器具名収集
+  const orphanNames=[];
+  floors.forEach(f=>Object.keys(f.counts).forEach(n=>{
+    if(f.counts[n]>0&&isOrphan(n)&&!orphanNames.includes(n))orphanNames.push(n);
+  }));
+  const allRows=[...fixtures.map(fx=>({name:fx.name,isOrphan:false})),
+                 ...orphanNames.map(n=>({name:n,isOrphan:true}))];
+
+  const wrap=document.createElement('div');
+  wrap.className='grid-wrap';
+  const tbl=document.createElement('table');
+  tbl.className='fx-grid';
+
+  // thead
+  const thead=document.createElement('thead');
+  const trHead=document.createElement('tr');
+  const thName=document.createElement('th');
+  thName.textContent='器具名';
+  trHead.appendChild(thName);
+  floors.forEach((floor,fi)=>{
+    const th=document.createElement('th');
+    th.className='floor-th';
+    th.innerHTML=`<div class="floor-th-inner"><input class="floor-th-name" value="${floor.name}" onchange="floors[${fi}].name=this.value;if(PC())renderFloorGrid()"><div class="floor-th-btns"><button class="floor-th-del" onclick="confirmDeleteFloor(${fi})">✕ 削除</button></div></div>`;
+    trHead.appendChild(th);
+  });
+  const thTotal=document.createElement('th');
+  thTotal.className='total-th';
+  thTotal.textContent='合計';
+  trHead.appendChild(thTotal);
+  thead.appendChild(trHead);
+  tbl.appendChild(thead);
+
+  // tbody
+  const tbody=document.createElement('tbody');
+  allRows.forEach(({name,isOrphan})=>{
+    const tr=document.createElement('tr');
+    const tdName=document.createElement('td');
+    tdName.className=isOrphan?'orphan-row':'';
+    if(isOrphan){
+      tdName.innerHTML=`<div style="display:flex;align-items:center;gap:6px;white-space:nowrap">`+
+        `<span style="color:var(--red);font-weight:600">${name} ⚠</span>`+
+        `<button class="btn btn-secondary btn-sm" style="flex-shrink:0;font-size:11px;padding:3px 8px" onclick="openReplaceModal(-1,'${escQ(name)}')">置き換え</button>`+
+        `</div>`;
+    }else{
+      tdName.textContent=name;
+    }
+    tr.appendChild(tdName);
+    let rowTotal=0;
+    floors.forEach((floor,fi)=>{
+      const count=floor.counts[name]||0;
+      rowTotal+=count;
+      const td=document.createElement('td');
+      td.className='count-cell'+(isOrphan?' orphan-cell':'');
+      const inp=document.createElement('input');
+      inp.type='number';inp.inputMode='numeric';inp.min='0';
+      inp.value=count||'';inp.placeholder='0';
+      inp.onchange=e=>{setCount(fi,name,e.target.value);if(PC())renderFloorGrid();};
+      td.appendChild(inp);
+      tr.appendChild(td);
+    });
+    const tdTotal=document.createElement('td');
+    tdTotal.className='total-cell'+(rowTotal===0?' zero':'');
+    tdTotal.textContent=rowTotal||'－';
+    tr.appendChild(tdTotal);
+    tbody.appendChild(tr);
+  });
+
+  // 台数合計行
+  const trSum=document.createElement('tr');
+  trSum.className='summary-row';
+  const tdSumLabel=document.createElement('td');
+  tdSumLabel.textContent='台数合計';
+  trSum.appendChild(tdSumLabel);
+  let grandTotal=0;
+  floors.forEach(floor=>{
+    const col=Object.values(floor.counts).reduce((s,v)=>s+v,0);
+    grandTotal+=col;
+    const td=document.createElement('td');td.textContent=col||'－';trSum.appendChild(td);
+  });
+  const tdGrand=document.createElement('td');
+  tdGrand.className='total-cell';tdGrand.textContent=grandTotal||'－';
+  trSum.appendChild(tdGrand);
+  tbody.appendChild(trSum);
+
+  // 公衆用WU合計行
+  const trWU=document.createElement('tr');
+  trWU.className='wu-row';
+  const tdWULabel=document.createElement('td');
+  tdWULabel.textContent='公衆用 WU合計';
+  trWU.appendChild(tdWULabel);
+  let grandWU=0;
+  floors.forEach(floor=>{
+    const wu=calcFloorWUDirect(floor);
+    grandWU+=wu.pub;
+    const td=document.createElement('td');
+    td.textContent=wu.pub>0?wu.pub.toFixed(1):'－';trWU.appendChild(td);
+  });
+  const tdGrandWU=document.createElement('td');
+  tdGrandWU.className='total-cell';tdGrandWU.textContent=grandWU>0?grandWU.toFixed(1):'－';
+  trWU.appendChild(tdGrandWU);
+  tbody.appendChild(trWU);
+
+  tbl.appendChild(tbody);
+  wrap.appendChild(tbl);
+  container.appendChild(wrap);
+
+  const addBtn=document.createElement('div');
+  addBtn.className='grid-add-btn';
+  addBtn.innerHTML=`<button class="btn btn-primary btn-sm" onclick="addFloor()">＋ エリア追加</button>`;
+  container.appendChild(addBtn);
+
+  updateResult();
+}
+
+function refreshFloorHeader(fi){
+  const floor=floors[fi];
+  const hasOrphan=floorHasOrphan(floor);
+  document.getElementById(`floor-body-${fi}`)?.closest('.floor-card')?.classList.toggle('has-orphan',hasOrphan);
+  const el=document.getElementById(`floor-warn-${fi}`);
+  if(el){el.className=hasOrphan?'floor-warn':'';el.textContent=hasOrphan?'⚠ 未登録器具あり':'';}
+}
+
+function renderFloorFixtures(fi){
+  const container=document.getElementById(`floor-fixtures-${fi}`);
+  container.innerHTML='';
+  const floor=floors[fi];
+  fixtures.forEach(fx=>{
+    const count=floor.counts[fx.name]||0;
+    const row=document.createElement('div');
+    row.className='fixture-row';
+    row.innerHTML=`<span class="fixture-name">${fx.name}</span><div class="fixture-count-wrap"><button class="btn btn-icon btn-minus" onclick="changeCount(${fi},'${escQ(fx.name)}',-1)">－</button><input class="count-input" type="number" inputmode="numeric" min="0" value="${count}" onchange="setCount(${fi},'${escQ(fx.name)}',this.value)"><button class="btn btn-icon btn-plus" onclick="changeCount(${fi},'${escQ(fx.name)}',1)">＋</button></div><span class="fixture-wu-display" id="fwu-${fi}-${escId(fx.name)}"></span>`;
+    container.appendChild(row);
+    updateFixtureWUByName(fi,fx.name);
+  });
+  Object.entries(floor.counts).forEach(([name,count])=>{
+    if(!count||!isOrphan(name))return;
+    const row=document.createElement('div');
+    row.className='fixture-row orphan';
+    row.innerHTML=`<span class="fixture-name orphan">${name}</span><span class="orphan-badge">マスタ未登録・WU除外</span><div class="fixture-count-wrap"><button class="btn btn-icon btn-minus" onclick="changeCount(${fi},'${escQ(name)}',-1)">－</button><input class="count-input" type="number" inputmode="numeric" min="0" value="${count}" onchange="setCount(${fi},'${escQ(name)}',this.value)"><button class="btn btn-icon btn-plus" onclick="changeCount(${fi},'${escQ(name)}',1)">＋</button></div><button class="btn btn-secondary btn-sm" onclick="openReplaceModal(-1,'${escQ(name)}')" style="flex-shrink:0">置き換え</button>`;
+    container.appendChild(row);
+  });
+}
+
+function escQ(s){return s.replace(/\\/g,'\\\\').replace(/'/g,"\\'");}
+function escId(s){return s.replace(/[^a-zA-Z0-9\u3000-\u9fff\u30a0-\u30ff\u3040-\u309f]/g,'_');}
+
+function toggleFloor(fi,e){
+  const body=document.getElementById(`floor-body-${fi}`),chev=document.getElementById(`floor-chev-${fi}`);
+  body.classList.toggle('open');chev.classList.toggle('open',body.classList.contains('open'));
+}
+
+function changeCount(fi,name,delta){
+  const next=Math.max(0,(floors[fi].counts[name]||0)+delta);
+  if(next===0)delete floors[fi].counts[name]; else floors[fi].counts[name]=next;
+  if(PC())renderFloorGrid(); else{renderFloorFixtures(fi);updateFloorWU(fi);}
+}
+
+function setCount(fi,name,val){
+  const v=Math.max(0,parseInt(val)||0);
+  if(v===0)delete floors[fi].counts[name]; else floors[fi].counts[name]=v;
+  updateFixtureWUByName(fi,name);updateFloorWU(fi);
+}
+
+function updateFixtureWUByName(fi,name){
+  const el=document.getElementById(`fwu-${fi}-${escId(name)}`);if(!el)return;
+  const count=floors[fi].counts[name]||0;
+  if(!count){el.textContent='';return;}
+  const fx=fixtures.find(f=>f.name===name);
+  el.textContent=(fx&&fx.pubWU!=null)?`WU:${(fx.pubWU*count).toFixed(0)}`:'';
+}
+
+function updateFloorWU(fi){
+  if(PC()){renderFloorGrid();return;}
+  const el=document.getElementById(`floor-wu-${fi}`);if(!el)return;
+  const wu=calcFloorWUDirect(floors[fi]);
+  el.textContent=(wu.pub||wu.pri)?`公衆:${wu.pub.toFixed(0)} 私室:${wu.pri.toFixed(0)} WU`:'';
+  updateResult();
+}
+
+function calcFloorWUDirect(floor){
+  let pub=0,pri=0;
+  fixtures.forEach(fx=>{
+    const c=floor.counts[fx.name]||0;if(!c)return;
+    if(fx.pubWU!=null)pub+=fx.pubWU*c;
+    if(!fx.noPri&&fx.priWU!=null)pri+=fx.priWU*c;
+  });
+  return{pub,pri};
+}
+
+function addFloor(){floors.push({id:uid(),name:`${floors.length+1}F`,counts:{}});renderFloors();}
+
+function confirmDeleteFloor(fi){
+  showModal(`「${floors[fi].name}」を削除`,`フロア「${floors[fi].name}」を削除しますか？`,
+    [{label:'キャンセル',cls:'btn-secondary',cb:closeModal},
+     {label:'削除',cls:'btn-danger',cb:()=>{floors.splice(fi,1);renderFloors();closeModal();}}
+    ]);
+}
+
+function clearAllFloors(){
+  showModal('全エリアクリア','全エリアのデータをクリアしますか？',
+    [{label:'キャンセル',cls:'btn-secondary',cb:closeModal},
+     {label:'クリア',cls:'btn-danger',cb:()=>{floors=[{id:uid(),name:'1F',counts:{}}];renderFloors();closeModal();}}
+    ]);
+}
+
+// ===== 置き換えモーダル =====
+let replaceState={fi:-1,orphanName:''};
+
+function openReplaceModal(fi,name){
+  replaceState={fi,orphanName:name};
+  document.getElementById('replace-orphan-name').textContent=name;
+  const sel=document.getElementById('replace-target-select');
+  sel.innerHTML='';
+  fixtures.forEach(fx=>{
+    const opt=document.createElement('option');opt.value=fx.name;opt.textContent=fx.name;sel.appendChild(opt);
+  });
+  const opt=document.createElement('option');opt.value='__new__';opt.textContent='── 新規追加（WU値を入力）──';sel.appendChild(opt);
+  document.getElementById('replace-new-area').style.display='none';
+  document.getElementById('replace-pub').value='';
+  document.getElementById('replace-pri').value='';
+  document.getElementById('replace-no-pri').checked=false;
+  document.getElementById('replace-modal').classList.remove('hidden');
+}
+
+function onReplaceTargetChange(){
+  document.getElementById('replace-new-area').style.display=
+    document.getElementById('replace-target-select').value==='__new__'?'':'none';
+}
+
+function closeReplaceModal(){document.getElementById('replace-modal').classList.add('hidden');}
+
+function confirmReplace(){
+  const {fi,orphanName}=replaceState;
+  const target=document.getElementById('replace-target-select').value;
+
+  if(target==='__new__'){
+    const noPri=document.getElementById('replace-no-pri').checked;
+    const pub=document.getElementById('replace-pub').value;
+    const pri=document.getElementById('replace-pri').value;
+    fixtures.push({name:orphanName,pubWU:pub!==''?parseFloat(pub):null,priWU:(!noPri&&pri!=='')?parseFloat(pri):null,noPri});
+    renderFixtureTable();
+    markDirty();
+    showMasterToast('器具マスタに追加しました。「器具設定」タブ →「別名保存」で保存してください。');
+  }else{
+    // fi=-1はPC版（全フロア一括置き換え）
+    const targets=fi===-1?floors.map((_,i)=>i):[fi];
+    targets.forEach(i=>{
+      const count=floors[i].counts[orphanName]||0;
+      if(!count)return;
+      floors[i].counts[target]=(floors[i].counts[target]||0)+count;
+      delete floors[i].counts[orphanName];
+    });
+  }
+
+  closeReplaceModal();
+  if(fi===-1){renderFloors();}
+  else{renderFloorFixtures(fi);refreshFloorHeader(fi);updateFloorWU(fi);}
+}
+
+// ===== Sample =====
+function loadSample(){
+  const doLoad=()=>{
+    applyMaster('shase',false);
+    floors=SAMPLE_DATA.floors.map(f=>({...f,id:uid(),counts:{...f.counts}}));
+    renderFloors();closeModal();
+  };
+  if(hasFloorData()){
+    showModal('サンプルデータ読込','現在の入力データを破棄してサンプルデータを読み込みますか？',
+      [{label:'キャンセル',cls:'btn-secondary',cb:closeModal},{label:'読込',cls:'btn-primary',cb:doLoad}]);
+  }else{doLoad();}
+}
+
+// ===== Result =====
+function updateResult(){
+  const tbody=document.getElementById('result-floor-tbody');
+  tbody.innerHTML='';
+  let totPub=0,totPri=0;
+  floors.forEach(floor=>{
+    const wu=calcFloorWUDirect(floor);
+    totPub+=wu.pub;totPri+=wu.pri;
+    tbody.innerHTML+=`<tr><td class="label">${floor.name}</td><td class="mono rnum">${wu.pub.toFixed(1)}</td><td class="mono rnum">${wu.pri.toFixed(1)}</td></tr>`;
+  });
+  tbody.innerHTML+=`<tr style="font-weight:700;background:var(--accent-pale)"><td class="label">合計</td><td class="mono rnum">${totPub.toFixed(1)}</td><td class="mono rnum">${totPri.toFixed(1)}</td></tr>`;
+
+  const qVPub=hunterInterp(HUNTER_VALVE,totPub),qVPri=hunterInterp(HUNTER_VALVE,totPri);
+  const qTPub=hunterInterp(HUNTER_TANK,totPub),qTPri=hunterInterp(HUNTER_TANK,totPri);
+
+  document.getElementById('result-flow-tbody').innerHTML=`
+    <tr><td class="label">負荷単位 (WU)</td><td class="mono rnum">${totPub.toFixed(1)}</td><td class="mono rnum">${totPri.toFixed(1)}</td></tr>
+    <tr><td class="label valve">洗浄弁多い場合 (L/min)</td><td class="rnum valve"><span class="flow-val">${qVPub.toFixed(1)}</span></td><td class="rnum valve"><span class="flow-val">${qVPri.toFixed(1)}</span></td></tr>
+    <tr><td class="label tank">洗浄タンク多い場合 (L/min)</td><td class="rnum tank"><span class="flow-val">${qTPub.toFixed(1)}</span></td><td class="rnum tank"><span class="flow-val">${qTPri.toFixed(1)}</span></td></tr>`;
+
+  const ftbody=document.getElementById('result-fixture-tbody');
+  ftbody.innerHTML='';
+  fixtures.forEach(fx=>{
+    let total=0;floors.forEach(f=>total+=(f.counts[fx.name]||0));if(!total)return;
+    const pu=fx.pubWU??'－',pt=fx.pubWU!=null?(fx.pubWU*total).toFixed(1):'－';
+    const riu=fx.noPri?'－':(fx.priWU??'－'),rit=fx.noPri?'－':(fx.priWU!=null?(fx.priWU*total).toFixed(1):'－');
+    ftbody.innerHTML+=`<tr><td class="nowrap">${fx.name}</td><td class="mono rnum">${total}</td><td class="mono rnum">${pu}</td><td class="mono rnum">${pt}</td><td class="mono rnum">${riu}</td><td class="mono rnum">${rit}</td></tr>`;
+  });
+  const orphanNames=new Set();
+  floors.forEach(f=>Object.keys(f.counts).forEach(n=>{if(f.counts[n]>0&&isOrphan(n))orphanNames.add(n);}));
+  orphanNames.forEach(name=>{
+    let total=0;floors.forEach(f=>total+=(f.counts[name]||0));
+    ftbody.innerHTML+=`<tr style="background:var(--red-bg)"><td class="nowrap" style="color:var(--red);font-weight:600">${name}<span style="font-size:10px;margin-left:6px">(マスタ未登録・除外)</span></td><td class="mono rnum">${total}</td><td class="mono rnum" colspan="4" style="color:var(--red);text-align:left;padding-left:16px">WU計算から除外</td></tr>`;
+  });
+}
+
+// ===== エリアJSON IO =====
+function exportFloors(){
+  const master=getMasterById(activeMasterId);
+  downloadJSON({type:'floor-data',masterName:master?master.name:'',fixtures,floors},'瞬時最大給水流量.json');
+}
+
+function importFloors(e){
+  const file=e.target.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=ev=>{
+    try{
+      const data=JSON.parse(ev.target.result);
+      if(!data.floors||!Array.isArray(data.floors))throw new Error('floors データが見つかりません');
+      const doImport=()=>{
+        if(data.fixtures&&Array.isArray(data.fixtures)){
+          fixtures=data.fixtures;activeMasterId='__imported__';masterDirty=true;
+          renderMasterBar();renderFixtureTable();
+        }
+        floors=data.floors;renderFloors();closeModal();
+      };
+      if(hasFloorData()){
+        showModal('JSON読込','現在の入力データを破棄して読み込みますか？',
+          [{label:'キャンセル',cls:'btn-secondary',cb:closeModal},{label:'読込',cls:'btn-primary',cb:doImport}]);
+      }else{doImport();}
+    }catch(err){alert('読込エラー：'+err.message);}
+  };
+  reader.readAsText(file);e.target.value='';
+}
+
+function exportCSV(){
+  const master=getMasterById(activeMasterId);
+  const masterName=master?master.name:'（未保存）';
+  const now=new Date();
+  const dateStr=`${now.getFullYear()}/${String(now.getMonth()+1).padStart(2,'0')}/${String(now.getDate()).padStart(2,'0')}`;
+  const rows=[];
+
+  rows.push(['瞬時最大給水流量 計算書']);
+  rows.push(['出力日',dateStr]);
+  rows.push(['使用マスタ',masterName]);
+  rows.push([]);
+
+  // --- セクション1：結果サマリー ---
+  rows.push(['【瞬時最大給水流量】']);
+  rows.push(['','公衆用','私室用']);
+  let totPub=0,totPri=0;
+  floors.forEach(floor=>{const wu=calcFloorWUDirect(floor);totPub+=wu.pub;totPri+=wu.pri;});
+  const qVPub=hunterInterp(HUNTER_VALVE,totPub),qVPri=hunterInterp(HUNTER_VALVE,totPri);
+  const qTPub=hunterInterp(HUNTER_TANK,totPub),qTPri=hunterInterp(HUNTER_TANK,totPri);
+  rows.push(['負荷単位合計 (WU)',totPub.toFixed(1),totPri.toFixed(1)]);
+  rows.push(['瞬時最大流量 洗浄弁多い場合 (L/min)',qVPub.toFixed(1),qVPri.toFixed(1)]);
+  rows.push(['瞬時最大流量 洗浄タンク多い場合 (L/min)',qTPub.toFixed(1),qTPri.toFixed(1)]);
+  rows.push([]);
+
+  // --- セクション2：階別器具数（拡張） ---
+  rows.push(['【階別器具数】']);
+
+  // 使用器具リスト（マスタ順 → orphan順）
+  const usedNamesSet=new Set();
+  floors.forEach(f=>Object.keys(f.counts).forEach(n=>{if(f.counts[n]>0)usedNamesSet.add(n);}));
+  // マスタ順を維持しつつorphanを末尾に
+  const usedFixtures=fixtures.filter(fx=>usedNamesSet.has(fx.name));
+  const orphanUsed=[...usedNamesSet].filter(n=>isOrphan(n));
+  // 全使用器具（マスタ登録分＋orphan）
+  const allUsed=[
+    ...usedFixtures.map(fx=>({name:fx.name,pubWU:fx.pubWU,priWU:fx.priWU,noPri:fx.noPri,isOrphan:false})),
+    ...orphanUsed.map(n=>({name:n,pubWU:null,priWU:null,noPri:false,isOrphan:true}))
+  ];
+
+  // ヘッダー行：器具名 | 1F | 2F | ... | 合計
+  rows.push(['器具名',...floors.map(f=>f.name),'合計']);
+
+  allUsed.forEach(fx=>{
+    const counts=floors.map(f=>f.counts[fx.name]||0);
+    const total=counts.reduce((a,b)=>a+b,0);
+    rows.push([fx.name,...counts,total]);
+  });
+
+  // 台数合計行
+  rows.push(['台数合計',...floors.map(f=>Object.values(f.counts).reduce((a,b)=>a+b,0)),
+    allUsed.reduce((s,fx)=>{let t=0;floors.forEach(f=>t+=(f.counts[fx.name]||0));return s+t;},0)
+  ]);
+  // 公衆用WU合計行
+  rows.push(['公衆用 WU合計',...floors.map(f=>calcFloorWUDirect(f).pub.toFixed(1)),totPub.toFixed(1)]);
+  // 私室用WU合計行
+  rows.push(['私室用 WU合計',...floors.map(f=>calcFloorWUDirect(f).pri.toFixed(1)),totPri.toFixed(1)]);
+  rows.push([]);
+
+  // --- セクション3：器具別集計 ---
+  rows.push(['【器具別集計】']);
+  rows.push(['器具名','台数合計','公衆用 原単位 (WU/台)','公衆用 WU合計','私室用 原単位 (WU/台)','私室用 WU合計','備考']);
+  fixtures.forEach(fx=>{
+    let total=0;floors.forEach(f=>total+=(f.counts[fx.name]||0));if(!total)return;
+    const pu=fx.pubWU??'－';
+    const pt=fx.pubWU!=null?(fx.pubWU*total).toFixed(1):'－';
+    const riu=fx.noPri?'－':(fx.priWU??'－');
+    const rit=fx.noPri?'－':(fx.priWU!=null?(fx.priWU*total).toFixed(1):'－');
+    rows.push([fx.name,total,pu,pt,riu,rit,'']);
+  });
+  const orphanNames=new Set();
+  floors.forEach(f=>Object.keys(f.counts).forEach(n=>{if(f.counts[n]>0&&isOrphan(n))orphanNames.add(n);}));
+  orphanNames.forEach(name=>{
+    let total=0;floors.forEach(f=>total+=(f.counts[name]||0));
+    rows.push([name,total,'－','－','－','－','マスタ未登録・除外']);
+  });
+
+  // CSV生成（BOM付きUTF-8）
+  const csv=rows.map(r=>r.map(v=>{
+    const s=String(v??'');
+    return /[,\n"]/.test(s)?`"${s.replace(/"/g,'""')}"`:s;
+  }).join(',')).join('\r\n');
+  const blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=`給水流量計算_${dateStr.replace(/\//g,'')}.csv`;
+  a.click();
+}
+
+function downloadJSON(data,filename){
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));
+  a.download=filename;a.click();
+}
+
+// ===== Toast =====
+let masterToastTimer=null;
+function showMasterToast(msg){
+  const el=document.getElementById('master-toast');
+  el.textContent=msg;el.style.display='block';
+  if(masterToastTimer)clearTimeout(masterToastTimer);
+  masterToastTimer=setTimeout(()=>{el.style.display='none';},8000);
+}
+
+// ===== Modal =====
+function showModal(title,body,buttons){
+  document.getElementById('confirm-title').textContent=title;
+  document.getElementById('confirm-msg').innerHTML=body;
+  const actions=document.getElementById('confirm-actions');
+  actions.innerHTML='';
+  buttons.forEach(b=>{
+    const btn=document.createElement('button');
+    btn.className='btn '+b.cls;btn.textContent=b.label;btn.onclick=b.cb;
+    actions.appendChild(btn);
+  });
+  document.getElementById('confirm-modal').classList.remove('hidden');
+}
+function closeModal(){document.getElementById('confirm-modal').classList.add('hidden');}
+
+// ===== Init =====
+(function(){
+  const savedId=loadActiveId();
+  const master=getMasterById(savedId);
+  activeMasterId=master?savedId:'shase';
+  fixtures=JSON.parse(JSON.stringify((master||getMasterById('shase')).fixtures));
+  renderMasterBar();
+  renderFixtureTable();
+  renderHunterTables();
+  renderFloors();
+  // PC初期表示：器具入力・結果を横並び表示
+  if(PC()){
+    document.querySelector('.pc-columns').style.display='flex';
+    document.querySelectorAll('.pc-overlay').forEach(el=>{el.style.display='none';});
+    document.querySelectorAll('.pc-only.tab-btn').forEach(b=>{
+      b.classList.toggle('active',b.dataset.tab==='__main__');
+    });
+    updateResult();
+  }else{
+    // スマホ初期：器具入力のみ表示
+    ['tab-fixture','tab-result','tab-manual'].forEach(t=>{
+      document.getElementById(t).style.display='none';
+    });
+    document.getElementById('tab-floor').style.display='';
+  }
+})();
+
+// ===== リサイズ対応 =====
+let resizeTimer=null;
+window.addEventListener('resize',()=>{
+  clearTimeout(resizeTimer);
+  resizeTimer=setTimeout(()=>{
+    if(PC()){
+      // PC表示に切替
+      document.querySelector('.pc-columns').style.display='flex';
+      document.getElementById('tab-floor').style.display='';
+      document.getElementById('tab-result').style.display='';
+      document.querySelectorAll('.pc-overlay').forEach(el=>{el.style.display='none';});
+      document.querySelectorAll('.pc-only.tab-btn').forEach(b=>{
+        b.classList.toggle('active',b.dataset.tab==='__main__');
+      });
+      renderFloors();
+      updateResult();
+    }else{
+      // スマホ表示に切替：器具入力タブに戻す
+      document.querySelector('.pc-columns').style.display='';
+      ['tab-fixture','tab-result','tab-manual'].forEach(t=>{
+        document.getElementById(t).style.display='none';
+      });
+      document.getElementById('tab-floor').style.display='';
+      renderFloors();
+      document.querySelectorAll('.sp-only.tab-btn').forEach(b=>{
+        b.classList.toggle('active',b.dataset.tab==='tab-floor');
+      });
+    }
+  },150);
+});
+</script>
+</body>
+</html>
