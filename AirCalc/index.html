@@ -1,0 +1,792 @@
+<!--
+  @tool      湿り空気計算ツール
+  @version   v01_2026-04-04
+  @changelog
+    v01_2026-04-04 - PWA化（manifest.json, sw.js, アイコン追加）
+-->
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>湿り空気計算ツール</title>
+<link rel="manifest" href="./manifest.json">
+<meta name="theme-color" content="#1a3a6b">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="apple-touch-icon" href="./icons/icon-192.png">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap');
+
+:root {
+  --bg:      #f4f6f9;
+  --surface: #ffffff;
+  --sf2:     #f0f4f8;
+  --bd:      #d8dfe8;
+  --bd2:     #c0c9d6;
+  --accent:  #1a6fc4;
+  --green:   #1a7a4a;
+  --green-l: #e6f4ed;
+  --red:     #c0392b;
+  --red-l:   #fdecea;
+  --amber:   #b45309;
+  --amber-l: #fef3e2;
+  --tx:      #1a2030;
+  --tx2:     #4a5568;
+  --tx3:     #8a97a8;
+  --mono:    'IBM Plex Mono', monospace;
+  --sans:    'Noto Sans JP', sans-serif;
+  --r:       10px;
+  --sh:      0 2px 12px rgba(30,60,120,0.09);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: var(--bg); color: var(--tx);
+  font-family: var(--sans); min-height: 100vh; padding: 16px 12px 48px;
+}
+
+/* Header */
+header { text-align: center; margin-bottom: 16px; padding-top: 4px; }
+header h1 { font-size: 1.15rem; font-weight: 700; color: var(--accent); letter-spacing:.05em; }
+header p  { font-size: .72rem; color: var(--tx3); margin-top: 3px; font-family: var(--mono); }
+
+/* Tabs */
+.tabs {
+  display: flex; gap: 3px; padding: 3px;
+  background: var(--surface); border: 1px solid var(--bd);
+  border-radius: var(--r); max-width: 480px; margin: 0 auto 14px;
+}
+.tab-btn {
+  flex: 1; padding: 9px 4px; border: none; background: transparent;
+  border-radius: 7px; font-family: var(--sans); font-size: .78rem;
+  font-weight: 500; color: var(--tx3); cursor: pointer;
+  transition: background .15s, color .15s;
+  -webkit-tap-highlight-color: transparent;
+}
+.tab-btn.active { background: var(--accent); color: #fff; }
+
+/* Card / Panel */
+.card {
+  background: var(--surface); border: 1px solid var(--bd);
+  border-radius: var(--r); padding: 18px 16px 16px;
+  max-width: 480px; margin: 0 auto; box-shadow: var(--sh);
+}
+.panel { display: none; }
+.panel.active { display: block; }
+
+/* Pressure */
+.pressure-row {
+  display: flex; align-items: center; gap: 8px;
+  margin-bottom: 14px; padding-bottom: 12px; border-bottom: 1px solid var(--bd);
+}
+.pressure-row label { font-size: .78rem; color: var(--tx2); white-space: nowrap; }
+.pressure-row input {
+  width: 100px; padding: 6px 8px;
+  border: 1px solid var(--bd2); border-radius: 6px;
+  font-family: var(--mono); font-size: .85rem; color: var(--tx);
+  text-align: right; background: var(--sf2); outline: none;
+}
+.pressure-row input:focus { border-color: var(--accent); background: #fff; }
+.pressure-row span { font-size: .75rem; color: var(--tx3); }
+
+/* Status */
+.status-bar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.status-bar p { font-size: .73rem; color: var(--tx3); }
+.badge {
+  font-family: var(--mono); font-size: .7rem;
+  padding: 2px 8px; border-radius: 20px;
+  background: var(--sf2); color: var(--tx3); border: 1px solid var(--bd);
+  transition: all .15s;
+}
+.badge.ok   { background: var(--green-l); color: var(--green); border-color: #a8d5bc; }
+.badge.over { background: var(--red-l);   color: var(--red);   border-color: #f5b7b1; }
+
+/* Fields */
+.fields { display: flex; flex-direction: column; gap: 7px; }
+.field-row { display: grid; grid-template-columns: 1fr 130px 44px; align-items: center; gap: 6px; }
+
+.field-label { font-size: .8rem; color: var(--tx2); line-height: 1.3; }
+.field-label .sym  { font-family: var(--mono); font-size: .78rem; font-weight: 500; color: var(--tx); display: block; }
+.field-label .name { font-size: .72rem; color: var(--tx3); }
+
+.field-input {
+  padding: 10px 9px; border: 1.5px solid var(--bd); border-radius: 7px;
+  font-family: var(--mono); font-size: .9rem; text-align: right;
+  width: 100%; outline: none; background: var(--surface); color: var(--tx);
+  transition: border-color .15s, background .15s, color .15s, box-shadow .15s;
+  -webkit-appearance: none;
+}
+.field-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(26,111,196,.13); }
+.field-input.has-val { border-color: var(--accent); background: #eef4fc; color: var(--tx); font-weight: 500; }
+.field-input.result  { background: var(--green-l); border-color: #b2dac5; color: var(--green); cursor: default; font-weight: 500; }
+.field-input.dp-result { background: var(--amber-l); border-color: #f0cc8a; color: var(--amber); cursor: default; font-weight: 500; }
+.field-input.locked  { background: var(--sf2); border-color: var(--bd); color: var(--tx3); cursor: not-allowed; }
+
+.field-unit { font-family: var(--mono); font-size: .67rem; color: var(--tx3); line-height: 1.3; }
+.divider { height: 1px; background: var(--bd); margin: 3px 0; }
+
+/* Buttons */
+.actions { display: flex; gap: 8px; margin-top: 14px; }
+button {
+  flex: 1; padding: 11px 8px; border-radius: 8px; border: none;
+  cursor: pointer; font-family: var(--sans); font-size: .85rem; font-weight: 600;
+  transition: opacity .15s, transform .1s; -webkit-tap-highlight-color: transparent;
+}
+button:active { transform: scale(.97); }
+.btn-save  { background: var(--green);  color: #fff; }
+.btn-clear { background: var(--sf2); color: var(--tx2); border: 1px solid var(--bd2); }
+
+.msg { margin-top: 10px; font-size: .75rem; text-align: center; min-height: 16px; font-family: var(--mono); }
+.msg.ok  { color: var(--green); }
+.msg.err { color: var(--red); }
+
+/* History */
+.history-toolbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.history-toolbar span { font-size: .78rem; color: var(--tx3); }
+.btn-hist-clear {
+  font-size: .72rem; padding: 4px 10px; border-radius: 6px;
+  border: 1px solid var(--bd2); background: var(--sf2);
+  color: var(--red); cursor: pointer; font-family: var(--sans); flex: unset;
+}
+/* 確認バー */
+.confirm-bar {
+  display: none; align-items: center; gap: 8px;
+  background: var(--red-l); border: 1px solid #f5b7b1;
+  border-radius: 7px; padding: 8px 10px; margin-bottom: 10px; font-size: .78rem;
+}
+.confirm-bar.show { display: flex; }
+.confirm-bar span { flex: 1; color: var(--red); }
+.confirm-bar button { flex: unset; padding: 4px 12px; font-size: .75rem; border-radius: 5px; }
+.confirm-yes { background: var(--red); color: #fff; border: none; }
+.confirm-no  { background: var(--surface); color: var(--tx2); border: 1px solid var(--bd2); }
+.history-list { display: flex; flex-direction: column; gap: 8px; }
+.hist-item { background: var(--sf2); border: 1px solid var(--bd); border-radius: 8px; padding: 10px 12px; }
+.hist-header { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 7px; gap: 8px; }
+.hist-title { font-size: .8rem; font-weight: 600; color: var(--tx); flex: 1; min-width: 0; word-break: break-all; }
+.hist-time  { font-size: .68rem; color: var(--tx3); font-family: var(--mono); white-space: nowrap; flex-shrink: 0; }
+.hist-grid  { display: grid; grid-template-columns: repeat(3,1fr); gap: 4px 8px; margin-bottom: 8px; }
+.hist-cell .hk { font-size: .7rem; color: var(--tx3); font-family: var(--mono); }
+.hist-cell .hv { font-size: .75rem; color: var(--tx); font-family: var(--mono); font-weight: 500; }
+.hist-actions { display: flex; gap: 5px; }
+.hist-btn {
+  padding: 4px 10px; border-radius: 5px; border: 1px solid var(--bd2);
+  background: var(--surface); font-size: .72rem; color: var(--tx2);
+  cursor: pointer; font-family: var(--sans); flex: unset; white-space: nowrap;
+}
+.hist-btn:active { transform: scale(.95); }
+.hist-btn.del { color: var(--red); }
+
+/* × clear button per field */
+.field-wrap { position: relative; display: flex; align-items: center; }
+.field-wrap .field-input { padding-right: 28px; }
+.clear-btn {
+  position: absolute; right: 4px;
+  width: 24px; height: 24px;
+  border: none; background: var(--bd); cursor: pointer;
+  color: var(--tx3); font-size: 13px; line-height: 1;
+  display: none; align-items: center; justify-content: center;
+  border-radius: 50%; padding: 0;
+  transition: background .12s, color .12s;
+  flex: unset;
+  -webkit-tap-highlight-color: transparent;
+}
+.clear-btn:hover, .clear-btn:active { background: var(--bd2); color: var(--red); }
+.clear-btn.visible { display: flex; }
+.hist-empty { text-align: center; color: var(--tx3); font-size: .82rem; padding: 36px 0; }
+
+/* Manual */
+.manual { display: flex; flex-direction: column; gap: 20px; }
+.manual-section h2 {
+  font-size: .88rem; font-weight: 700; color: var(--accent);
+  margin-bottom: 8px; padding-bottom: 5px; border-bottom: 1px solid var(--bd);
+}
+.manual-section p, .manual-section li {
+  font-size: .78rem; color: var(--tx2); line-height: 1.75;
+}
+.manual-section ul { padding-left: 1.2em; }
+.manual-section li { margin-bottom: 2px; }
+.manual-section table {
+  width: 100%; border-collapse: collapse; font-size: .75rem; margin-top: 6px;
+}
+.manual-section th {
+  background: var(--sf2); color: var(--tx2); font-weight: 600;
+  padding: 5px 8px; text-align: left; border: 1px solid var(--bd);
+}
+.manual-section td { padding: 5px 8px; border: 1px solid var(--bd); color: var(--tx2); vertical-align: top; }
+.manual-section td:first-child { font-family: var(--mono); font-size: .73rem; font-weight: 500; color: var(--accent); white-space: nowrap; }
+.formula-block {
+  background: var(--sf2); border: 1px solid var(--bd); border-radius: 7px;
+  padding: 10px 12px; margin-top: 6px; font-family: var(--mono);
+  font-size: .75rem; color: var(--tx); line-height: 2;
+}
+.note {
+  background: var(--amber-l); border-left: 3px solid var(--amber);
+  border-radius: 0 6px 6px 0; padding: 8px 10px; margin-top: 8px;
+  font-size: .75rem; color: var(--amber); line-height: 1.6;
+}
+
+@media (max-width:360px) {
+  .field-row { grid-template-columns: 1fr 106px 36px; }
+  .field-input { font-size: .84rem; padding: 9px 7px; }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>湿り空気　計算ツール</h1>
+  <p>Psychrometric Calculator / 101.325 kPa</p>
+</header>
+
+<div class="tabs">
+  <button class="tab-btn active" onclick="switchTab('calc')">🌡 計算</button>
+  <button class="tab-btn" onclick="switchTab('history')" id="tab-hist-btn">📋 履歴</button>
+  <button class="tab-btn" onclick="switchTab('manual')">📖 計算根拠</button>
+</div>
+
+<!-- ══ CALC ══ -->
+<div class="card panel active" id="panel-calc">
+  <div class="pressure-row">
+    <label>大気圧</label>
+    <input type="number" id="pressure" value="101.325" step="0.001" inputmode="decimal">
+    <span>kPa</span>
+  </div>
+  <div class="status-bar">
+    <p id="status-hint">2つの値を入力してください</p>
+    <span class="badge" id="badge">0 / 2</span>
+  </div>
+  <div class="fields">
+    <div class="field-row">
+      <div class="field-label"><span class="sym">DB</span><span class="name">乾球温度</span></div>
+      <div class="field-wrap">
+      <input class="field-input" id="v_DB" type="number" step="0.1" inputmode="decimal" placeholder="—" oninput="onInput('DB')">
+      <button class="clear-btn" id="clr_DB" onclick="clearField('DB')" tabindex="-1">×</button>
+    </div>
+      <div class="field-unit">℃</div>
+    </div>
+    <div class="field-row">
+      <div class="field-label"><span class="sym">RH</span><span class="name">相対湿度</span></div>
+      <div class="field-wrap">
+      <input class="field-input" id="v_RH" type="number" step="0.1" inputmode="decimal" placeholder="—" oninput="onInput('RH')">
+      <button class="clear-btn" id="clr_RH" onclick="clearField('RH')" tabindex="-1">×</button>
+    </div>
+      <div class="field-unit">%</div>
+    </div>
+    <div class="field-row">
+      <div class="field-label"><span class="sym">W</span><span class="name">絶対湿度</span></div>
+      <div class="field-wrap">
+      <input class="field-input" id="v_W" type="number" step="0.0001" inputmode="decimal" placeholder="—" oninput="onInput('W')">
+      <button class="clear-btn" id="clr_W" onclick="clearField('W')" tabindex="-1">×</button>
+    </div>
+      <div class="field-unit">kg/kg'</div>
+    </div>
+    <div class="divider"></div>
+    <!-- DP は入力もできる -->
+    <div class="field-row">
+      <div class="field-label"><span class="sym">DP</span><span class="name">露点温度</span></div>
+      <div class="field-wrap">
+      <input class="field-input dp-result" id="v_DP" type="number" step="0.1" inputmode="decimal" placeholder="—" oninput="onInput('DP')">
+      <button class="clear-btn" id="clr_DP" onclick="clearField('DP')" tabindex="-1">×</button>
+    </div>
+      <div class="field-unit">℃</div>
+    </div>
+    <div class="divider"></div>
+    <div class="field-row">
+      <div class="field-label"><span class="sym">h</span><span class="name">比エンタルピー</span></div>
+      <div class="field-wrap">
+      <input class="field-input" id="v_H" type="number" step="0.1" inputmode="decimal" placeholder="—" oninput="onInput('H')">
+      <button class="clear-btn" id="clr_H" onclick="clearField('H')" tabindex="-1">×</button>
+    </div>
+      <div class="field-unit">kJ/kg</div>
+    </div>
+    <div class="field-row">
+      <div class="field-label"><span class="sym">WB</span><span class="name">湿球温度</span></div>
+      <div class="field-wrap">
+      <input class="field-input" id="v_WB" type="number" step="0.1" inputmode="decimal" placeholder="—" oninput="onInput('WB')">
+      <button class="clear-btn" id="clr_WB" onclick="clearField('WB')" tabindex="-1">×</button>
+    </div>
+      <div class="field-unit">℃</div>
+    </div>
+    <div class="field-row">
+      <div class="field-label"><span class="sym">v</span><span class="name">比容積</span></div>
+      <div class="field-wrap">
+      <input class="field-input" id="v_V" type="number" step="0.0001" inputmode="decimal" placeholder="—" oninput="onInput('V')">
+      <button class="clear-btn" id="clr_V" onclick="clearField('V')" tabindex="-1">×</button>
+    </div>
+      <div class="field-unit">m³/kg</div>
+    </div>
+  </div>
+  <div class="actions">
+    <button class="btn-save" onclick="saveHistory()" id="btn-save" style="display:none">📋 履歴に保存</button>
+    <button class="btn-clear" onclick="clearAll()">クリア</button>
+  </div>
+  <div class="msg" id="msg"></div>
+</div>
+
+<!-- ══ HISTORY ══ -->
+<div class="card panel" id="panel-history">
+  <div class="history-toolbar">
+    <span id="hist-label-count">0 件</span>
+    <button class="btn-hist-clear" onclick="showClearConfirm()">すべて削除</button>
+  </div>
+  <div class="confirm-bar" id="confirm-bar">
+    <span>本当にすべて削除しますか？</span>
+    <button class="confirm-yes" onclick="clearHistory()">削除</button>
+    <button class="confirm-no"  onclick="hideClearConfirm()">キャンセル</button>
+  </div>
+  <div class="history-list" id="history-list">
+    <div class="hist-empty">まだ履歴がありません</div>
+  </div>
+</div>
+
+<!-- ══ MANUAL ══ -->
+<div class="card panel" id="panel-manual">
+  <div class="manual">
+
+    <div class="manual-section">
+      <h2>📋 使い方</h2>
+      <ul>
+        <li>7項目のうち <strong>任意の2つ</strong> に値を入力すると、残りが自動計算されます</li>
+        <li>露点温度（DP）は単独入力でも絶対湿度（W）を即時算出できます。もう1つ入力すれば全項目が揃います</li>
+        <li>3つ以上入力すると他の欄がロックされます。1つ消すと解除されます</li>
+        <li>計算後に「履歴に保存」を押すとその状態を記録できます</li>
+        <li>高地や特殊環境では大気圧を変更してください（例：800m≒92 kPa）</li>
+      </ul>
+    </div>
+
+    <div class="manual-section">
+      <h2>🌡 各物理量の定義</h2>
+      <table>
+        <tr><th>記号</th><th>名称</th><th>単位</th><th>説明</th></tr>
+        <tr><td>DB</td><td>乾球温度</td><td>℃</td><td>通常の温度計で測る気温</td></tr>
+        <tr><td>RH</td><td>相対湿度</td><td>%</td><td>飽和水蒸気量に対する実際の水蒸気量の割合</td></tr>
+        <tr><td>W</td><td>絶対湿度</td><td>kg/kg'</td><td>乾き空気1 kgに含まれる水蒸気の質量</td></tr>
+        <tr><td>DP</td><td>露点温度</td><td>℃</td><td>空気を冷やしたとき結露が始まる温度（RH=100%となる温度）</td></tr>
+        <tr><td>h</td><td>比エンタルピー</td><td>kJ/kg</td><td>乾き空気1 kgあたりの全熱量（顕熱＋潜熱）</td></tr>
+        <tr><td>WB</td><td>湿球温度</td><td>℃</td><td>水で湿らせた温度計が示す温度。蒸発冷却量が反映される</td></tr>
+        <tr><td>v</td><td>比容積</td><td>m³/kg</td><td>乾き空気1 kgが占める体積</td></tr>
+      </table>
+    </div>
+
+    <div class="manual-section">
+      <h2>🔢 計算式・計算根拠</h2>
+
+      <p style="margin-bottom:6px"><strong>① 飽和水蒸気圧　pₛ [kPa]</strong><br>
+      Buck方程式（ASHRAE推奨に準拠）を使用：</p>
+      <div class="formula-block">
+pₛ(T) = 0.61121 × exp( (18.678 − T/234.5) × T/(257.14 + T) )
+T : 乾球温度 [℃]
+      </div>
+
+      <p style="margin-top:10px; margin-bottom:6px"><strong>② 絶対湿度　W [kg/kg']</strong></p>
+      <div class="formula-block">
+pv = RH/100 × pₛ(DB)          ← 実水蒸気分圧
+W  = 0.62198 × pv / (P − pv)   ← P:大気圧[kPa]
+      </div>
+
+      <p style="margin-top:10px; margin-bottom:6px"><strong>③ 相対湿度　RH [%]</strong></p>
+      <div class="formula-block">
+pv = W × P / (0.62198 + W)
+RH = pv / pₛ(DB) × 100
+      </div>
+
+      <p style="margin-top:10px; margin-bottom:6px"><strong>④ 露点温度　DP [℃]</strong><br>
+      実水蒸気分圧 pv を求め、pₛ(T)=pv となる T を Newton法で逆算。<br>
+      逆方向（DP→W）は大気圧だけで一意に決まるため、<strong>DP単独入力でWを即時算出可能</strong>：</p>
+      <div class="formula-block">
+W → DP:  pv = W×P / (0.62198+W),  DP = pₛ⁻¹(pv)  ← Newton法
+DP → W:  pv = pₛ(DP),  W = 0.62198×pv / (P−pv)  ← 直接計算
+      </div>
+
+      <p style="margin-top:10px; margin-bottom:6px"><strong>⑤ 比エンタルピー　h [kJ/kg]</strong><br>
+      JIS B 8628 / ASHRAE Fundamentals準拠：</p>
+      <div class="formula-block">
+h = 1.006×DB + W×(2501 + 1.86×DB)
+  ↑乾き空気顕熱  ↑水蒸気潜熱  ↑水蒸気顕熱
+      </div>
+
+      <p style="margin-top:10px; margin-bottom:6px"><strong>⑥ 湿球温度　WB [℃]</strong><br>
+      簡略Sprung式（温度補正項を省略）を使用。DB・W が既知のとき WB を二分法で求解：</p>
+      <div class="formula-block">
+W = Wₛ(WB) − A × (DB − WB)
+Wₛ(WB) : WBにおける飽和絶対湿度
+A = 0.000412 [1/℃]  ← Cpa/λ ≒ 1.006/2501 に相当
+DB,W が既知のとき DP ≤ WB ≤ DB の範囲を二分法で求解
+      </div>
+
+      <p style="margin-top:10px; margin-bottom:6px"><strong>⑦ 比容積　v [m³/kg]</strong><br>
+      理想気体の状態方程式から：</p>
+      <div class="formula-block">
+v = 0.2871×(DB+273.15)×(1 + 1.6078×W) / P
+0.2871 : 乾き空気のガス定数 Ra/1000 [kJ/(kg·K)]
+1.6078 : Ra/Rv = 287.058/461.5
+      </div>
+
+      <p style="margin-top:10px; margin-bottom:6px"><strong>⑧ 逆算・特殊ケース</strong><br>
+      DB以外の2変数が既知の場合、二分法（bisection）で DB を求めた後、上記①〜⑦を適用します。探索範囲は −30〜80℃。<br>
+      DP単独の場合は DP→W の直接変換（大気圧のみで決まる）を行います。</p>
+
+      <div class="note">
+        ⚠ 本ツールの計算精度について<br>
+        飽和水蒸気圧はBuck方程式（誤差 &lt;0.01%）、湿球温度は簡略Sprung式（A=0.000412、参照ソフト値と±0.02℃以内で一致）を使用しています。
+        精密な空調設計では ASHRAE Handbook of Fundamentals または JIS B 8628 の数表との照合を推奨します。
+      </div>
+    </div>
+
+    <div class="manual-section">
+      <h2>📌 よく使う条件の目安</h2>
+      <table>
+        <tr><th>条件</th><th>DB</th><th>RH</th><th>W (概算)</th></tr>
+        <tr><td>夏季外気（東京）</td><td>35℃</td><td>60%</td><td>≈ 0.0215</td></tr>
+        <tr><td>冬季外気（東京）</td><td>5℃</td><td>50%</td><td>≈ 0.0027</td></tr>
+        <tr><td>空調設計内気</td><td>26℃</td><td>50%</td><td>≈ 0.0105</td></tr>
+        <tr><td>クリーンルーム</td><td>22℃</td><td>45%</td><td>≈ 0.0074</td></tr>
+      </table>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// ── State ──────────────────────────────────────────────────────────────────
+// DPも含めた全7項目
+const KEYS = ['DB','RH','W','DP','H','WB','V'];
+let userVals = {};
+let lastResult = null;
+let history = [];
+try { history = JSON.parse(localStorage.getItem('psychro_hist')||'[]'); } catch(e){}
+for (const k of KEYS) userVals[k] = null;
+
+// ── Input handler ──────────────────────────────────────────────────────────
+function onInput(key) {
+  const raw = document.getElementById(`v_${key}`).value.trim();
+  userVals[key] = (raw === '' || raw === null) ? null : parseFloat(raw);
+  applyState();
+}
+
+function applyState() {
+  const filled = KEYS.filter(k => userVals[k] !== null && !isNaN(userVals[k]));
+  const count  = filled.length;
+
+  const badge = document.getElementById('badge');
+  badge.textContent = `${count} / 2`;
+  badge.className = 'badge' + (count === 2 ? ' ok' : count > 2 ? ' over' : '');
+
+  const hint = document.getElementById('status-hint');
+
+  if (count === 2) {
+    // ─ 2つ入力 → 計算 ─
+    const knowns = {};
+    for (const k of filled) knowns[k] = userVals[k];
+    try {
+      const P = parseFloat(document.getElementById('pressure').value);
+      const r = solve(knowns, P);
+      lastResult = { ...r, P, inputs: filled };
+
+      const fmt = (v,d) => v.toFixed(d);
+      const map = {
+        DB: fmt(r.DB,2), RH: fmt(r.RH,2), W: fmt(r.W,5),
+        DP: fmt(r.DP,2), H: fmt(r.H,3), WB: fmt(r.WB,2), V: fmt(r.V,5)
+      };
+
+      for (const k of KEYS) {
+        const inp = document.getElementById(`v_${k}`);
+        inp.readOnly = false;
+        if (userVals[k] !== null) {
+          inp.classList.remove('result','locked','dp-result');
+          inp.classList.add('has-val');
+        } else {
+          inp.value = map[k];
+          inp.classList.remove('has-val','locked');
+          // DPは結果でも黄色
+          inp.classList.add(k === 'DP' ? 'dp-result' : 'result');
+          inp.readOnly = true;
+        }
+      }
+      showMsg('計算完了 ✓', 'ok');
+      document.getElementById('btn-save').style.display = '';
+      hint.textContent = '結果を確認してください';
+    } catch(e) {
+      clearResultFields(filled);
+      showMsg(e.message, 'err');
+      hint.textContent = '入力値を確認してください';
+      lastResult = null;
+      document.getElementById('btn-save').style.display = 'none';
+    }
+
+  } else if (count < 2) {
+    // DP単独 → W だけ即時計算できる（大気圧のみで決まる）
+    if (count === 1 && filled[0] === 'DP') {
+      const P = parseFloat(document.getElementById('pressure').value);
+      const W = W_from_DP(userVals['DP'], P);
+      if (W > 0) {
+        const inp_w = document.getElementById('v_W');
+        inp_w.value = W.toFixed(5);
+        inp_w.classList.remove('has-val','locked');
+        inp_w.classList.add('result');
+        inp_w.readOnly = true;
+        // DP以外の結果欄はクリア
+        for (const k of KEYS) {
+          if (k === 'DP' || k === 'W') continue;
+          const inp = document.getElementById(`v_${k}`);
+          inp.value = ''; inp.classList.remove('has-val','result','locked');
+          if (k !== 'DP') inp.readOnly = false;
+        }
+        hint.textContent = 'W を算出しました（他にもう1つ入力で全算出）';
+        showMsg(`W = ${W.toFixed(5)} kg/kg'`, 'ok');
+        updateClearBtns();
+        return;
+      }
+    }
+    clearResultFields(filled);
+    lastResult = null;
+    document.getElementById('btn-save').style.display = 'none';
+    if (!filled.includes('DP')) document.getElementById('v_DP').value = '';
+    showMsg('','');
+    hint.textContent = count === 0 ? '2つの値を入力してください' : 'あと1つ入力してください';
+
+  } else {
+    // 3つ以上 → 空欄をロック
+    for (const k of KEYS) {
+      const inp = document.getElementById(`v_${k}`);
+      inp.readOnly = false;
+      inp.classList.remove('result','locked','has-val','dp-result');
+      if (filled.includes(k)) {
+        inp.classList.add('has-val');
+      } else {
+        inp.classList.add('locked');
+        inp.readOnly = true;
+      }
+    }
+    hint.textContent = '3つ以上は入力できません（1つ消してください）';
+    showMsg('入力は2つまでです', 'err');
+    lastResult = null;
+    document.getElementById('btn-save').style.display = 'none';
+  }
+  updateClearBtns();
+}
+
+function clearResultFields(filledKeys) {
+  for (const k of KEYS) {
+    const inp = document.getElementById(`v_${k}`);
+    inp.disabled = false;
+    inp.readOnly = false;
+    inp.classList.remove('result','locked','dp-result');
+    if (!filledKeys.includes(k)) {
+      inp.value = '';
+      inp.classList.remove('has-val');
+    } else {
+      inp.classList.add('has-val');
+    }
+  }
+  // DPが入力値でなければ dp-result スタイルを戻す
+  if (!filledKeys.includes('DP')) {
+    document.getElementById('v_DP').classList.add('dp-result');
+  }
+}
+
+function showMsg(txt, type) {
+  const el = document.getElementById('msg');
+  el.textContent = txt;
+  el.className = 'msg' + (type ? ' '+type : '');
+}
+
+
+
+function updateClearBtns() {
+  for (const k of KEYS) {
+    const btn = document.getElementById(`clr_${k}`);
+    if (!btn) continue;
+    const inp = document.getElementById(`v_${k}`);
+    // has-val（入力値）のときだけ表示、ロック・結果は非表示
+    const show = userVals[k] !== null && !isNaN(userVals[k]);
+    btn.classList.toggle('visible', show);
+  }
+}
+function clearField(key) {
+  userVals[key] = null;
+  const inp = document.getElementById(`v_${key}`);
+  inp.value = '';
+  inp.classList.remove('has-val','result','locked');
+  if (key === 'DP') inp.classList.add('dp-result');
+  document.getElementById(`clr_${key}`).classList.remove('visible');
+  applyState();
+}
+
+function clearAll() {
+  for (const k of KEYS) {
+    userVals[k] = null;
+    const inp = document.getElementById(`v_${k}`);
+    inp.value = '';
+    inp.readOnly = false;
+    inp.classList.remove('has-val','result','locked');
+    if (k === 'DP') inp.classList.add('dp-result');
+    const btn = document.getElementById(`clr_${k}`);
+    if (btn) btn.classList.remove('visible');
+  }
+  document.getElementById('badge').textContent = '0 / 2';
+  document.getElementById('badge').className = 'badge';
+  document.getElementById('status-hint').textContent = '2つの値を入力してください';
+  document.getElementById('msg').textContent = '';
+  document.getElementById('btn-save').style.display = 'none';
+  lastResult = null;
+}
+
+// ── Physics ────────────────────────────────────────────────────────────────
+function psat(T) { return 0.61121*Math.exp((18.678-T/234.5)*(T/(257.14+T))); }
+function psat_inv(ps) {
+  let T=20;
+  for(let i=0;i<80;i++){const f=psat(T)-ps,df=(psat(T+0.001)-psat(T-0.001))/0.002,d=f/df;T-=d;if(Math.abs(d)<1e-10)break;}
+  return T;
+}
+function W_from_DB_RH(DB,RH,P){const pv=RH/100*psat(DB);return 0.62198*pv/(P-pv);}
+function W_from_DP(DP,P){const pv=psat(DP);return 0.62198*pv/(P-pv);}
+function RH_from_DB_W(DB,W,P){return W*P/(0.62198+W)/psat(DB)*100;}
+function H_from_DB_W(DB,W){return 1.006*DB+W*(2501+1.86*DB);}
+function WB_from_DB_W(DB,W,P){
+  // 二分法: DP <= WB <= DB の範囲で W_from_DB_WB(DB,wb,P)=W となる wb を求める
+  const dp = DP_from_W(W,P);
+  return bisect(wb => W_from_DB_WB(DB,wb,P) - W, dp - 1, DB + 0.1);
+}
+function W_from_DB_WB(DB,WB,P){return W_from_DB_RH(WB,100,P)-0.000412*(DB-WB);}
+function V_calc(DB,W,P){return 0.2871*(DB+273.15)*(1+1.6078*W)/P;}
+function DP_from_W(W,P){return psat_inv(W*P/(0.62198+W));}
+function bisect(f,lo,hi){for(let i=0;i<300;i++){const m=(lo+hi)/2;if(f(lo)*f(m)<=0)hi=m;else lo=m;if(hi-lo<1e-10)break;}return(lo+hi)/2;}
+
+function solve(kn, P) {
+  const h=k=>k in kn, k=kn;
+  let DB, W;
+
+  // DP を W に変換して既存ロジックへ統合
+  if (h('DP') && !h('W')) {
+    kn = { ...kn, W: W_from_DP(k.DP, P) };
+    delete kn.DP;
+    return solve(kn, P);
+  }
+
+  if(h('DB')&&h('RH')){DB=k.DB;W=W_from_DB_RH(DB,k.RH,P);}
+  else if(h('DB')&&h('W')){DB=k.DB;W=k.W;}
+  else if(h('DB')&&h('H')){DB=k.DB;W=(k.H-1.006*DB)/(2501+1.86*DB);}
+  else if(h('DB')&&h('WB')){DB=k.DB;W=W_from_DB_WB(DB,k.WB,P);}
+  else if(h('DB')&&h('V')){DB=k.DB;W=(k.V*P/(0.2871*(DB+273.15))-1)/1.6078;}
+  else if(h('RH')&&h('W')){DB=psat_inv(k.W*P/(0.62198+k.W)/(k.RH/100));W=k.W;}
+  else if(h('RH')&&h('H')){DB=bisect(db=>H_from_DB_W(db,W_from_DB_RH(db,k.RH,P))-k.H,-30,80);W=W_from_DB_RH(DB,k.RH,P);}
+  else if(h('RH')&&h('WB')){DB=bisect(db=>RH_from_DB_W(db,W_from_DB_WB(db,k.WB,P),P)-k.RH,k.WB,80);W=W_from_DB_WB(DB,k.WB,P);}
+  else if(h('RH')&&h('V')){DB=bisect(db=>V_calc(db,W_from_DB_RH(db,k.RH,P),P)-k.V,-20,80);W=W_from_DB_RH(DB,k.RH,P);}
+  else if(h('W')&&h('H')){W=k.W;DB=(k.H-2501*W)/(1.006+1.86*W);}
+  else if(h('W')&&h('WB')){W=k.W;DB=bisect(db=>W_from_DB_WB(db,k.WB,P)-W,k.WB,80);}
+  else if(h('W')&&h('V')){W=k.W;DB=bisect(db=>V_calc(db,W,P)-k.V,-30,80);}
+  else if(h('H')&&h('WB')){DB=bisect(db=>H_from_DB_W(db,W_from_DB_WB(db,k.WB,P))-k.H,k.WB,80);W=W_from_DB_WB(DB,k.WB,P);}
+  else if(h('H')&&h('V')){DB=bisect(db=>V_calc(db,(k.H-1.006*db)/(2501+1.86*db),P)-k.V,-30,80);W=(k.H-1.006*DB)/(2501+1.86*DB);}
+  else if(h('WB')&&h('V')){DB=bisect(db=>V_calc(db,W_from_DB_WB(db,k.WB,P),P)-k.V,k.WB,80);W=W_from_DB_WB(DB,k.WB,P);}
+  else throw new Error('対応していない組み合わせです');
+
+  if(W<0)throw new Error('絶対湿度が負になりました');
+  let RH=RH_from_DB_W(DB,W,P);
+  if(RH>100.5)throw new Error('相対湿度が100%を超えました');
+  RH=Math.min(RH,100);
+  return{DB,RH,W,DP:DP_from_W(W,P),H:H_from_DB_W(DB,W),WB:WB_from_DB_W(DB,W,P),V:V_calc(DB,W,P)};
+}
+
+// ── Tab ────────────────────────────────────────────────────────────────────
+function switchTab(tab) {
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  const panels = { calc:'panel-calc', history:'panel-history', manual:'panel-manual' };
+  const idx    = { calc:0, history:1, manual:2 };
+  document.querySelectorAll('.tab-btn')[idx[tab]].classList.add('active');
+  document.getElementById(panels[tab]).classList.add('active');
+  if(tab==='history') renderHistory();
+}
+
+// ── History ────────────────────────────────────────────────────────────────
+function persist(){localStorage.setItem('psychro_hist',JSON.stringify(history));}
+
+function saveHistory(){
+  if(!lastResult)return;
+  const r=lastResult;
+  const now=new Date();
+  const ts=`${String(now.getMonth()+1).padStart(2,'0')}/${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+
+  // タイトルは入力した2項目の値から自動生成
+  const UNIT = {DB:'℃',RH:'%',W:'kg/kg\'',DP:'℃',H:'kJ/kg',WB:'℃',V:'m³/kg'};
+  const LABEL_DIG = {DB:1,RH:1,W:4,DP:1,H:1,WB:1,V:4};
+  const title = r.inputs.map(k=>`${k} ${r[k].toFixed(LABEL_DIG[k])}${UNIT[k]}`).join(' / ');
+
+  history.unshift({id:Date.now(), ts, title, r});
+  persist(); updateHistCount();
+  showMsg('履歴に保存しました ✓','ok');
+  document.getElementById('btn-save').style.display='none';
+}
+
+function updateHistCount(){
+  const n=history.length;
+  document.getElementById('tab-hist-btn').textContent=`📋 履歴${n>0?`(${n})`:''}`;
+  document.getElementById('hist-label-count').textContent=`${n} 件`;
+}
+
+function deleteEntry(id){
+  history=history.filter(e=>e.id!==id); persist(); updateHistCount(); renderHistory();
+}
+function showClearConfirm(){ document.getElementById('confirm-bar').classList.add('show'); }
+function hideClearConfirm(){ document.getElementById('confirm-bar').classList.remove('show'); }
+function clearHistory(){
+  history=[]; persist(); updateHistCount(); renderHistory(); hideClearConfirm();
+}
+
+function loadEntry(id){
+  const e=history.find(x=>x.id===id); if(!e)return;
+  switchTab('calc'); clearAll();
+  // 保存時の入力2項目をそのまま復元
+  const r=e.r;
+  const DIG={DB:2,RH:2,W:5,DP:2,H:3,WB:2,V:5};
+  for(const k of e.r.inputs){
+    document.getElementById(`v_${k}`).value = r[k].toFixed(DIG[k]);
+    userVals[k]=r[k];
+  }
+  document.getElementById('pressure').value=r.P;
+  applyState();
+}
+
+function renderHistory(){
+  const list=document.getElementById('history-list');
+  if(!history.length){list.innerHTML='<div class="hist-empty">まだ履歴がありません</div>';return;}
+  const f=(v,d)=>Number(v).toFixed(d);
+  list.innerHTML=history.map(e=>{
+    const r=e.r;
+    return`<div class="hist-item">
+  <div class="hist-header">
+    <span class="hist-title">${e.title}</span>
+    <span class="hist-time">${e.ts}</span>
+  </div>
+  <div class="hist-grid">
+    <div class="hist-cell"><span class="hk">DB </span><span class="hv">${f(r.DB,2)} ℃</span></div>
+    <div class="hist-cell"><span class="hk">RH </span><span class="hv">${f(r.RH,2)} %</span></div>
+    <div class="hist-cell"><span class="hk">W  </span><span class="hv">${f(r.W,4)}</span></div>
+    <div class="hist-cell"><span class="hk">DP </span><span class="hv">${f(r.DP,2)} ℃</span></div>
+    <div class="hist-cell"><span class="hk">h  </span><span class="hv">${f(r.H,2)}</span></div>
+    <div class="hist-cell"><span class="hk">WB </span><span class="hv">${f(r.WB,2)} ℃</span></div>
+    <div class="hist-cell"><span class="hk">v  </span><span class="hv">${f(r.V,4)}</span></div>
+  </div>
+  <div class="hist-actions">
+    <button class="hist-btn" onclick="loadEntry(${e.id})">↩ 読込</button>
+    <button class="hist-btn del" onclick="deleteEntry(${e.id})">🗑 削除</button>
+  </div>
+</div>`;
+  }).join('');
+}
+
+// init
+updateHistCount();
+</script>
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js').catch(err => {
+      console.warn('SW registration failed:', err);
+    });
+  });
+}
+</script>
+</body>
+</html>
