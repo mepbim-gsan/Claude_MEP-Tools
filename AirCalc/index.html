@@ -1,8 +1,8 @@
 <!--
-  @tool      湿り空気計算ツール
-  @version   v01_2026-04-04
+  @tool      湿り空気 計算ツール
+  @version   v01_2026-04-15
   @changelog
-    v01_2026-04-04 - PWA化（manifest.json, sw.js, アイコン追加）
+    v01_2026-04-15 - 空気線図・比較チャート・四則演算・マイナス入力対応、使い方更新
 -->
 <!DOCTYPE html>
 <html lang="ja">
@@ -10,11 +10,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>湿り空気計算ツール</title>
-<link rel="manifest" href="./manifest.json">
-<meta name="theme-color" content="#1a3a6b">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<link rel="apple-touch-icon" href="./icons/icon-192.png">
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap');
 
@@ -42,7 +37,7 @@
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body {
   background: var(--bg); color: var(--tx);
-  font-family: var(--sans); min-height: 100vh; padding: 16px 12px 48px;
+  font-family: var(--sans); min-height: 100vh; padding: 16px 6px 48px;
 }
 
 /* Header */
@@ -54,7 +49,7 @@ header p  { font-size: .72rem; color: var(--tx3); margin-top: 3px; font-family: 
 .tabs {
   display: flex; gap: 3px; padding: 3px;
   background: var(--surface); border: 1px solid var(--bd);
-  border-radius: var(--r); max-width: 480px; margin: 0 auto 14px;
+  border-radius: var(--r); max-width: 600px; margin: 0 auto 14px;
 }
 .tab-btn {
   flex: 1; padding: 9px 4px; border: none; background: transparent;
@@ -68,8 +63,8 @@ header p  { font-size: .72rem; color: var(--tx3); margin-top: 3px; font-family: 
 /* Card / Panel */
 .card {
   background: var(--surface); border: 1px solid var(--bd);
-  border-radius: var(--r); padding: 18px 16px 16px;
-  max-width: 480px; margin: 0 auto; box-shadow: var(--sh);
+  border-radius: var(--r); padding: 18px 10px 16px;
+  max-width: 600px; margin: 0 auto; box-shadow: var(--sh);
 }
 .panel { display: none; }
 .panel.active { display: block; }
@@ -125,6 +120,31 @@ header p  { font-size: .72rem; color: var(--tx3); margin-top: 3px; font-family: 
 .field-unit { font-family: var(--mono); font-size: .67rem; color: var(--tx3); line-height: 1.3; }
 .divider { height: 1px; background: var(--bd); margin: 3px 0; }
 
+/* 演算子ボタン（タッチデバイスのみ表示）*/
+.op-btns {
+  display: none;
+  gap: 4px;
+  margin-top: 4px;
+  margin-left: -4px;
+  margin-right: -4px;
+}
+.op-btns.active { display: flex; }
+.op-btn {
+  flex: 1; padding: 8px 2px;
+  border: 1px solid var(--bd2); border-radius: 6px;
+  background: var(--sf2); color: var(--tx2);
+  font-family: var(--mono); font-size: .82rem;
+  cursor: pointer; text-align: center;
+  -webkit-tap-highlight-color: transparent;
+  transition: background .1s;
+}
+.op-btn:active { background: var(--accent); color: #fff; }
+.op-btn.op-del { color: var(--red); }
+@media (pointer: coarse) {
+  .op-btns { display: none; }   /* activeクラスで制御 */
+  .field-wrap { margin-bottom: 0; }
+}
+
 /* Buttons */
 .actions { display: flex; gap: 8px; margin-top: 14px; }
 button {
@@ -160,8 +180,11 @@ button:active { transform: scale(.97); }
 .confirm-yes { background: var(--red); color: #fff; border: none; }
 .confirm-no  { background: var(--surface); color: var(--tx2); border: 1px solid var(--bd2); }
 .history-list { display: flex; flex-direction: column; gap: 8px; }
-.hist-item { background: var(--sf2); border: 1px solid var(--bd); border-radius: 8px; padding: 10px 12px; }
-.hist-header { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 7px; gap: 8px; }
+.hist-item { background: var(--sf2); border: 1.5px solid var(--bd); border-radius: 8px; padding: 10px 12px; cursor: pointer; -webkit-tap-highlight-color: transparent; transition: border-color .15s, background .15s; }
+.hist-item.selected { border-color: var(--accent); background: #eef4fd; }
+.hist-item.sel-full { opacity: 0.5; cursor: default; }
+.hist-header { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 7px; gap: 6px; }
+.hist-num { font-size: 1.05rem; line-height: 1; min-width: 20px; flex-shrink: 0; }
 .hist-title { font-size: .8rem; font-weight: 600; color: var(--tx); flex: 1; min-width: 0; word-break: break-all; }
 .hist-time  { font-size: .68rem; color: var(--tx3); font-family: var(--mono); white-space: nowrap; flex-shrink: 0; }
 .hist-grid  { display: grid; grid-template-columns: repeat(3,1fr); gap: 4px 8px; margin-bottom: 8px; }
@@ -175,6 +198,23 @@ button:active { transform: scale(.97); }
 }
 .hist-btn:active { transform: scale(.95); }
 .hist-btn.del { color: var(--red); }
+/* 比較チャートエリア */
+.hist-compare-wrap {
+  position: relative;
+  border: 1px solid var(--bd); border-radius: var(--r);
+  background: var(--surface);
+  margin-bottom: 12px;
+}
+.hist-compare-wrap canvas { display: block; width: 100%; height: auto; }
+.hist-compare-hint { text-align: center; font-size: .68rem; color: var(--tx3); padding: 3px 0 2px; }
+.hist-compare-empty { text-align: center; color: var(--tx3); font-size: .8rem; padding: 32px 0; display: none; }
+.compare-tooltip {
+  position: fixed; background: rgba(26,42,80,0.92); color: #fff;
+  font-family: var(--mono); font-size: .72rem; padding: 6px 10px;
+  border-radius: 6px; pointer-events: none; display: none;
+  white-space: nowrap; line-height: 1.7; z-index: 100;
+}
+.hist-sel-label { font-size: .72rem; color: var(--tx3); margin-bottom: 6px; }
 
 /* × clear button per field */
 .field-wrap { position: relative; display: flex; align-items: center; }
@@ -229,6 +269,26 @@ button:active { transform: scale(.97); }
   .field-row { grid-template-columns: 1fr 106px 36px; }
   .field-input { font-size: .84rem; padding: 9px 7px; }
 }
+
+/* Chart */
+.chart-wrap {
+  margin-top: 14px;
+  border: 1px solid var(--bd);
+  border-radius: var(--r);
+  background: var(--surface);
+  overflow: hidden;
+}
+.chart-wrap canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.chart-hint {
+  text-align: center;
+  font-size: .68rem;
+  color: var(--tx3);
+  padding: 4px 0 2px;
+}
 </style>
 </head>
 <body>
@@ -259,7 +319,7 @@ button:active { transform: scale(.97); }
     <div class="field-row">
       <div class="field-label"><span class="sym">DB</span><span class="name">乾球温度</span></div>
       <div class="field-wrap">
-      <input class="field-input" id="v_DB" type="number" step="0.1" inputmode="decimal" placeholder="—" oninput="onInput('DB')">
+      <input class="field-input" id="v_DB" type="text" inputmode="decimal" pattern="-?[0-9]*.?[0-9]*" placeholder="—" oninput="onInput('DB')" onfocus="focusedKey='DB';_showOpBar('DB')" onblur="onBlurCalc(this,'DB')">
       <button class="clear-btn" id="clr_DB" onclick="clearField('DB')" tabindex="-1">×</button>
     </div>
       <div class="field-unit">℃</div>
@@ -267,7 +327,7 @@ button:active { transform: scale(.97); }
     <div class="field-row">
       <div class="field-label"><span class="sym">RH</span><span class="name">相対湿度</span></div>
       <div class="field-wrap">
-      <input class="field-input" id="v_RH" type="number" step="0.1" inputmode="decimal" placeholder="—" oninput="onInput('RH')">
+      <input class="field-input" id="v_RH" type="number" step="0.1" inputmode="decimal" placeholder="—" oninput="onInput('RH')" onfocus="focusedKey='RH';_showOpBar('RH')" onblur="onBlurCalc(this,'RH')">
       <button class="clear-btn" id="clr_RH" onclick="clearField('RH')" tabindex="-1">×</button>
     </div>
       <div class="field-unit">%</div>
@@ -275,7 +335,7 @@ button:active { transform: scale(.97); }
     <div class="field-row">
       <div class="field-label"><span class="sym">W</span><span class="name">絶対湿度</span></div>
       <div class="field-wrap">
-      <input class="field-input" id="v_W" type="number" step="0.0001" inputmode="decimal" placeholder="—" oninput="onInput('W')">
+      <input class="field-input" id="v_W" type="number" step="0.0001" inputmode="decimal" placeholder="—" oninput="onInput('W')" onfocus="focusedKey='W';_showOpBar('W')" onblur="onBlurCalc(this,'W')">
       <button class="clear-btn" id="clr_W" onclick="clearField('W')" tabindex="-1">×</button>
     </div>
       <div class="field-unit">kg/kg'</div>
@@ -285,7 +345,7 @@ button:active { transform: scale(.97); }
     <div class="field-row">
       <div class="field-label"><span class="sym">DP</span><span class="name">露点温度</span></div>
       <div class="field-wrap">
-      <input class="field-input dp-result" id="v_DP" type="number" step="0.1" inputmode="decimal" placeholder="—" oninput="onInput('DP')">
+      <input class="field-input dp-result" id="v_DP" type="text" inputmode="decimal" pattern="-?[0-9]*.?[0-9]*" placeholder="—" oninput="onInput('DP')" onfocus="focusedKey='DP';_showOpBar('DP')" onblur="onBlurCalc(this,'DP')">
       <button class="clear-btn" id="clr_DP" onclick="clearField('DP')" tabindex="-1">×</button>
     </div>
       <div class="field-unit">℃</div>
@@ -294,7 +354,7 @@ button:active { transform: scale(.97); }
     <div class="field-row">
       <div class="field-label"><span class="sym">h</span><span class="name">比エンタルピー</span></div>
       <div class="field-wrap">
-      <input class="field-input" id="v_H" type="number" step="0.1" inputmode="decimal" placeholder="—" oninput="onInput('H')">
+      <input class="field-input" id="v_H" type="text" inputmode="decimal" pattern="-?[0-9]*.?[0-9]*" placeholder="—" oninput="onInput('H')" onfocus="focusedKey='H';_showOpBar('H')" onblur="onBlurCalc(this,'H')">
       <button class="clear-btn" id="clr_H" onclick="clearField('H')" tabindex="-1">×</button>
     </div>
       <div class="field-unit">kJ/kg</div>
@@ -302,7 +362,7 @@ button:active { transform: scale(.97); }
     <div class="field-row">
       <div class="field-label"><span class="sym">WB</span><span class="name">湿球温度</span></div>
       <div class="field-wrap">
-      <input class="field-input" id="v_WB" type="number" step="0.1" inputmode="decimal" placeholder="—" oninput="onInput('WB')">
+      <input class="field-input" id="v_WB" type="text" inputmode="decimal" pattern="-?[0-9]*.?[0-9]*" placeholder="—" oninput="onInput('WB')" onfocus="focusedKey='WB';_showOpBar('WB')" onblur="onBlurCalc(this,'WB')">
       <button class="clear-btn" id="clr_WB" onclick="clearField('WB')" tabindex="-1">×</button>
     </div>
       <div class="field-unit">℃</div>
@@ -310,21 +370,44 @@ button:active { transform: scale(.97); }
     <div class="field-row">
       <div class="field-label"><span class="sym">v</span><span class="name">比容積</span></div>
       <div class="field-wrap">
-      <input class="field-input" id="v_V" type="number" step="0.0001" inputmode="decimal" placeholder="—" oninput="onInput('V')">
+      <input class="field-input" id="v_V" type="number" step="0.0001" inputmode="decimal" placeholder="—" oninput="onInput('V')" onfocus="focusedKey='V';_showOpBar('V')" onblur="onBlurCalc(this,'V')">
       <button class="clear-btn" id="clr_V" onclick="clearField('V')" tabindex="-1">×</button>
     </div>
       <div class="field-unit">m³/kg</div>
     </div>
+  </div>
+  <div class="op-btns" id="op-btns">
+    <button class="op-btn" ontouchstart="event.preventDefault();opInsert('+')">+</button>
+    <button class="op-btn" ontouchstart="event.preventDefault();opInsert('-')">−</button>
+    <button class="op-btn" ontouchstart="event.preventDefault();opInsert('*')">×</button>
+    <button class="op-btn" ontouchstart="event.preventDefault();opInsert('/')">÷</button>
+    <button class="op-btn" ontouchstart="event.preventDefault();opInsert('(')">(</button>
+    <button class="op-btn" ontouchstart="event.preventDefault();opInsert(')')">)</button>
+    <button class="op-btn op-del" ontouchstart="event.preventDefault();opDelete()">⌫</button>
   </div>
   <div class="actions">
     <button class="btn-save" onclick="saveHistory()" id="btn-save" style="display:none">📋 履歴に保存</button>
     <button class="btn-clear" onclick="clearAll()">クリア</button>
   </div>
   <div class="msg" id="msg"></div>
+  <div class="chart-wrap">
+    <canvas id="psychro-chart"></canvas>
+    <div class="chart-hint">長押し / ダブルクリックで画像保存</div>
+  </div>
 </div>
 
 <!-- ══ HISTORY ══ -->
 <div class="card panel" id="panel-history">
+  <!-- 比較チャート -->
+  <div class="hist-compare-wrap" id="hist-compare-wrap">
+    <canvas id="compare-canvas"></canvas>
+    <div class="compare-tooltip" id="compare-tooltip"></div>
+  </div>
+  <div class="hist-compare-empty" id="hist-compare-empty">履歴を選択するとプロットされます</div>
+  <div class="hist-compare-hint">タップでツールチップ　　長押し / ダブルクリックで画像保存</div>
+  <!-- 件数・選択状況 -->
+  <div class="hist-sel-label" id="hist-sel-label"></div>
+  <!-- ツールバー -->
   <div class="history-toolbar">
     <span id="hist-label-count">0 件</span>
     <button class="btn-hist-clear" onclick="showClearConfirm()">すべて削除</button>
@@ -349,8 +432,21 @@ button:active { transform: scale(.97); }
         <li>7項目のうち <strong>任意の2つ</strong> に値を入力すると、残りが自動計算されます</li>
         <li>露点温度（DP）は単独入力でも絶対湿度（W）を即時算出できます。もう1つ入力すれば全項目が揃います</li>
         <li>3つ以上入力すると他の欄がロックされます。1つ消すと解除されます</li>
+        <li>マイナス値（氷点下など）は <strong>−15℃</strong> まで入力できます</li>
+        <li>入力欄で <strong>四則演算式</strong>（例：<code>26+2</code>、<code>(35+28)/2</code>）を入力してフォーカスを外すと自動計算されます。スマートフォンでは入力欄の下に演算子ボタンが表示されます</li>
         <li>計算後に「履歴に保存」を押すとその状態を記録できます</li>
         <li>高地や特殊環境では大気圧を変更してください（例：800m≒92 kPa）</li>
+      </ul>
+    </div>
+
+    <div class="manual-section">
+      <h2>📊 空気線図・比較チャート</h2>
+      <ul>
+        <li>計算タブの下部に <strong>空気線図</strong> をリアルタイム表示します。計算結果の状態点を●でプロットします</li>
+        <li>履歴タブでは保存した条件を最大5点まで選択して <strong>比較チャート</strong> に重ねてプロットできます（①〜⑤で色分け表示）</li>
+        <li>履歴アイテムをタップして選択・解除できます。番号はタップした順に付与されます</li>
+        <li>比較チャートの点をタップすると、その条件の詳細がツールチップで表示されます</li>
+        <li>空気線図・比較チャートともに <strong>長押し / ダブルクリックで画像保存</strong> できます</li>
       </ul>
     </div>
 
@@ -457,11 +553,83 @@ let history = [];
 try { history = JSON.parse(localStorage.getItem('psychro_hist')||'[]'); } catch(e){}
 for (const k of KEYS) userVals[k] = null;
 
+// 比較チャート用
+const HIST_NUMS   = ['①','②','③','④','⑤'];
+const HIST_COLORS = ['#1a6fc4','#e05c2a','#1a9a4a','#9b3db8','#c4971a'];
+let histSelected  = [];  // タップした順のid配列（最大5）
+
 // ── Input handler ──────────────────────────────────────────────────────────
+let focusedKey = null;  // 現在フォーカス中のフィールドキー
+
+function _showOpBar(key) {
+  focusedKey = key;
+  // タッチデバイスのみ表示
+  if (window.matchMedia('(pointer: coarse)').matches) {
+    document.getElementById('op-btns').classList.add('active');
+  }
+}
+
 function onInput(key) {
   const raw = document.getElementById(`v_${key}`).value.trim();
-  userVals[key] = (raw === '' || raw === null) ? null : parseFloat(raw);
+  // 途中入力または式（カッコ・演算子含む）はapplyStateを呼ばない
+  const isPartial = raw === '-' || raw === '.' || raw === '-.' || /\.$/.test(raw);
+  const isExpr = /[+*/÷×()]/.test(raw) || /[^-][+\-]/.test(raw);
+  if (isPartial || isExpr) {
+    userVals[key] = null;
+    return;
+  }
+  userVals[key] = (raw === '') ? null : parseFloat(raw);
   applyState();
+}
+
+// ── 簡易四則演算（onblur）──────────────────────────────────────────────────
+function evalExpr(raw) {
+  // 使用可能: 数値・小数・マイナス・+ - * / ( )
+  // 安全のため許可文字のみ通す
+  const s = raw.replace(/\s/g, '').replace(/÷/g, '/').replace(/×/g, '*');
+  if (!/^[-+*/().0-9]+$/.test(s)) return NaN;
+  // 演算子を含む式かチェック
+  if (!/[+\-*/]/.test(s.replace(/^-/, ''))) return parseFloat(s);
+  try {
+    // Function経由で計算（evalより安全：グローバルスコープ非汚染）
+    const v = Function('"use strict"; return (' + s + ')')();
+    return (typeof v === 'number' && isFinite(v)) ? v : NaN;
+  } catch(e) { return NaN; }
+}
+
+function onBlurCalc(el, key) {
+  const raw = el.value.trim();
+  if (raw === '' || raw === '-') return;
+  // 演算子またはカッコを含む場合のみ評価
+  if (!/[+\-*/÷×()]/.test(raw.replace(/^-/, ''))) return;
+  const result = evalExpr(raw);
+  if (isNaN(result)) return;
+  // 小数桁は元の入力に応じて自動調整（最大5桁）
+  const dec = (raw.split('.')[1] || '').replace(/[^0-9]/g,'').length;
+  el.value = result.toFixed(Math.min(dec || 2, 5));
+  userVals[key] = result;
+  applyState();
+}
+
+// ── 演算子ボタン（スマホ用）─────────────────────────────────────────────────
+function opInsert(op) {
+  if (!focusedKey) return;
+  const el = document.getElementById(`v_${focusedKey}`);
+  if (!el || el.readOnly) return;
+  el.value += op;
+  // onblurを手動トリガー（演算子のみの場合は何もしない）
+  onInput(focusedKey);
+  // フォーカスを戻す（キーボードを再表示しないよう preventScroll）
+  el.focus({ preventScroll: true });
+}
+
+function opDelete() {
+  if (!focusedKey) return;
+  const el = document.getElementById(`v_${focusedKey}`);
+  if (!el || el.readOnly) return;
+  el.value = el.value.slice(0, -1);
+  onInput(focusedKey);
+  el.focus({ preventScroll: true });
 }
 
 function applyState() {
@@ -504,6 +672,7 @@ function applyState() {
         }
       }
       showMsg('計算完了 ✓', 'ok');
+      updateChart();
       document.getElementById('btn-save').style.display = '';
       hint.textContent = '結果を確認してください';
     } catch(e) {
@@ -630,6 +799,7 @@ function clearAll() {
   document.getElementById('msg').textContent = '';
   document.getElementById('btn-save').style.display = 'none';
   lastResult = null;
+  updateChart();
 }
 
 // ── Physics ────────────────────────────────────────────────────────────────
@@ -726,12 +896,14 @@ function updateHistCount(){
 }
 
 function deleteEntry(id){
-  history=history.filter(e=>e.id!==id); persist(); updateHistCount(); renderHistory();
+  history=history.filter(e=>e.id!==id);
+  histSelected=histSelected.filter(x=>x!==id);
+  persist(); updateHistCount(); renderHistory();
 }
 function showClearConfirm(){ document.getElementById('confirm-bar').classList.add('show'); }
 function hideClearConfirm(){ document.getElementById('confirm-bar').classList.remove('show'); }
 function clearHistory(){
-  history=[]; persist(); updateHistCount(); renderHistory(); hideClearConfirm();
+  history=[]; histSelected=[]; persist(); updateHistCount(); renderHistory(); hideClearConfirm();
 }
 
 function loadEntry(id){
@@ -748,14 +920,237 @@ function loadEntry(id){
   applyState();
 }
 
+function toggleHistSelect(id) {
+  const idx = histSelected.indexOf(id);
+  if (idx >= 0) {
+    histSelected.splice(idx, 1);
+  } else {
+    if (histSelected.length >= 5) return;
+    histSelected.push(id);
+  }
+  renderHistory();
+}
+
+function renderCompareChart() {
+  const canvas = document.getElementById('compare-canvas');
+  if (!canvas) return;
+  const P = parseFloat(document.getElementById('pressure').value) || 101.325;
+
+  // 選択エントリをタップ順で取得
+  const entries = histSelected
+    .map(id => history.find(e => e.id === id))
+    .filter(Boolean);
+
+  const dpr  = window.devicePixelRatio || 1;
+  const W_px = canvas.offsetWidth || 540;
+  const H_px = Math.round(W_px * 0.72);
+  canvas.width  = W_px * dpr;
+  canvas.height = H_px * dpr;
+  canvas.style.height = H_px + 'px';
+
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+
+  const ml = 30, mr = 30, mt = 22, mb = 38;
+  const cw = W_px - ml - mr;
+  const ch = H_px - mt - mb;
+  const DB_MIN = -15, DB_MAX = 50, W_MIN = 0, W_MAX = 40;
+
+  function toX(db)    { return ml + (db - DB_MIN) / (DB_MAX - DB_MIN) * cw; }
+  function toY(w_gkg) { return mt + ch - (w_gkg - W_MIN) / (W_MAX - W_MIN) * ch; }
+
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0, 0, W_px, H_px);
+
+  // グリッド
+  ctx.strokeStyle = '#e4eaf2'; ctx.lineWidth = 0.5;
+  for (let db = DB_MIN; db <= DB_MAX; db += 5) {
+    ctx.beginPath(); ctx.moveTo(toX(db), mt); ctx.lineTo(toX(db), mt+ch); ctx.stroke();
+  }
+  for (let w = 0; w <= W_MAX; w += 5) {
+    ctx.beginPath(); ctx.moveTo(ml, toY(w)); ctx.lineTo(ml+cw, toY(w)); ctx.stroke();
+  }
+
+  const fs = Math.round(W_px * 0.021);
+
+  // h線
+  ctx.setLineDash([4, 3]); ctx.lineWidth = 0.8;
+  for (const h of [-20, 0, 20, 40, 60, 80, 100, 120]) {
+    ctx.strokeStyle = '#7ecdd6';
+    ctx.beginPath(); let started = false;
+    for (let db = DB_MIN; db <= DB_MAX + 0.1; db += 0.5) {
+      const w_gkg = (h - 1.006*db) / (2501+1.86*db) * 1000;
+      if (w_gkg < W_MIN-0.5 || w_gkg > W_MAX+0.5) { started=false; continue; }
+      const x=toX(db), y=toY(Math.max(W_MIN,Math.min(W_MAX,w_gkg)));
+      if (!started) { ctx.moveTo(x,y); started=true; } else ctx.lineTo(x,y);
+    }
+    ctx.stroke();
+    ctx.save(); ctx.setLineDash([]);
+    ctx.fillStyle='#4aacb8'; ctx.font=`${fs}px IBM Plex Mono, monospace`;
+    const wl = (h-1.006*DB_MIN)/(2501+1.86*DB_MIN)*1000;
+    if (wl>=W_MIN+0.5&&wl<=W_MAX-0.5) { ctx.textAlign='left'; ctx.fillText(h,toX(DB_MIN)+2,toY(wl)-2); }
+    else { const dbAt0=h/1.006; if(dbAt0>=DB_MIN&&dbAt0<=DB_MAX){ctx.textAlign='center';ctx.fillText(h,toX(dbAt0),toY(W_MIN)-4);} }
+    ctx.restore();
+  }
+  ctx.setLineDash([]);
+
+  // RH曲線
+  for (const rh of [10,20,30,40,50,60,70,80,90,100]) {
+    const t=rh/100;
+    const r=Math.round(26+(180-26)*(1-t)), g=Math.round(111+(210-111)*(1-t)), b=Math.round(196+(230-196)*(1-t));
+    ctx.strokeStyle=`rgb(${r},${g},${b})`; ctx.lineWidth=rh===100?1.6:0.9;
+    ctx.beginPath(); let started=false;
+    for (let db=DB_MIN; db<=DB_MAX+0.1; db+=0.5) {
+      const pv=rh/100*psat(db); if(pv>=P){started=false;continue;}
+      const w_gkg=0.62198*pv/(P-pv)*1000; if(w_gkg>W_MAX+0.5){started=false;continue;}
+      const x=toX(db),y=toY(Math.min(W_MAX,w_gkg));
+      if(!started){ctx.moveTo(x,y);started=true;}else ctx.lineTo(x,y);
+    }
+    ctx.stroke();
+    const pvr=rh/100*psat(DB_MAX);
+    if(pvr<P){const wr=0.62198*pvr/(P-pvr)*1000;if(wr>=W_MIN&&wr<=W_MAX){ctx.save();ctx.fillStyle=`rgb(${r},${g},${b})`;ctx.font=`${fs}px IBM Plex Mono, monospace`;ctx.textAlign='left';ctx.fillText(rh,toX(DB_MAX)+3,toY(wr)+4);ctx.restore();}}
+  }
+
+  // 軸枠
+  ctx.strokeStyle='#8a97a8'; ctx.lineWidth=1; ctx.strokeRect(ml,mt,cw,ch);
+
+  // X軸
+  ctx.fillStyle='#4a5568'; ctx.font=`${fs}px IBM Plex Mono, monospace`; ctx.textAlign='center';
+  for (let db=DB_MIN; db<=DB_MAX; db+=5) ctx.fillText(db,toX(db),mt+ch+14);
+  ctx.font=`${Math.round(W_px*0.024)}px Noto Sans JP, sans-serif`;
+  ctx.fillText('乾球温度 [℃]',ml+cw/2,mt+ch+30);
+
+  // Y軸
+  ctx.font=`${fs}px IBM Plex Mono, monospace`; ctx.textAlign='right';
+  for (let w=0; w<=W_MAX; w+=5){ctx.fillStyle='#4a5568';ctx.fillText(w,ml-4,toY(w)+4);}
+  ctx.save(); ctx.translate(11,mt+ch/2); ctx.rotate(-Math.PI/2); ctx.textAlign='center';
+  ctx.font=`${Math.round(W_px*0.024)}px Noto Sans JP, sans-serif`; ctx.fillStyle='#4a5568';
+  ctx.fillText("絶対湿度 [g/kg']",0,0); ctx.restore();
+
+  // 右軸
+  ctx.save(); ctx.translate(W_px-11,mt+ch/2); ctx.rotate(-Math.PI/2); ctx.textAlign='center';
+  ctx.font=`${Math.round(W_px*0.024)}px Noto Sans JP, sans-serif`; ctx.fillStyle='#4a90b8';
+  ctx.fillText('相対湿度 [%]',0,0); ctx.restore();
+
+  // h ラベル
+  ctx.fillStyle='#4aacb8'; ctx.font=`${fs}px Noto Sans JP, sans-serif`;
+  ctx.textAlign='left'; ctx.fillText('h [kJ/kg]',ml+4,mt-5);
+
+  // プロット点（番号付き）
+  canvas._plotPoints = [];
+  const numFs = Math.round(W_px * 0.022);
+  entries.forEach((e, i) => {
+    const db  = e.r.DB;
+    const w_g = e.r.W * 1000;
+    if (db<DB_MIN||db>DB_MAX||w_g<W_MIN||w_g>W_MAX) return;
+    const px=toX(db), py=toY(w_g), color=HIST_COLORS[i];
+    // 後光
+    ctx.beginPath(); ctx.arc(px,py,9,0,2*Math.PI);
+    ctx.globalAlpha=0.18; ctx.fillStyle=color; ctx.fill(); ctx.globalAlpha=1;
+    // 塗り円
+    ctx.beginPath(); ctx.arc(px,py,7,0,2*Math.PI);
+    ctx.fillStyle=color; ctx.fill();
+    ctx.strokeStyle='#fff'; ctx.lineWidth=1.2; ctx.stroke();
+    // 番号
+    ctx.font=`bold ${numFs}px Noto Sans JP, sans-serif`;
+    ctx.fillStyle='#fff'; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(HIST_NUMS[i],px,py); ctx.textBaseline='alphabetic';
+    canvas._plotPoints.push({px,py,entry:e,idx:i,color});
+  });
+
+  // イベント（初回のみ）
+  if (!canvas._eventsBound) {
+    canvas._eventsBound = true;
+    const tooltip = document.getElementById('compare-tooltip');
+
+    const showTip = (canvasCx, canvasCy, clientX, clientY) => {
+      if (!canvas._plotPoints) return;
+      let hit = null;
+      for (const pt of canvas._plotPoints) {
+        if (Math.hypot(canvasCx-pt.px, canvasCy-pt.py) < 18) { hit=pt; break; }
+      }
+      if (hit) {
+        const r=hit.entry.r, f=(v,d)=>Number(v).toFixed(d);
+        tooltip.innerHTML =
+          `<span style="color:${hit.color}">${HIST_NUMS[hit.idx]}</span>　${hit.entry.title}<br>` +
+          `DB ${f(r.DB,2)} ℃　RH ${f(r.RH,2)} %　W ${f(r.W,4)} kg/kg'<br>` +
+          `DP ${f(r.DP,2)} ℃　h ${f(r.H,2)} kJ/kg　WB ${f(r.WB,2)} ℃`;
+        tooltip.style.display='block';
+        requestAnimationFrame(()=>{
+          const tw=tooltip.offsetWidth, th=tooltip.offsetHeight;
+          const vw=window.innerWidth, vh=window.innerHeight;
+          let tx=clientX+14, ty=clientY-14;
+          if(tx+tw>vw-8) tx=clientX-tw-14;
+          if(ty<8) ty=clientY+14;
+          if(ty+th>vh-8) ty=vh-th-8;
+          tooltip.style.left=tx+'px'; tooltip.style.top=ty+'px';
+        });
+      } else {
+        tooltip.style.display='none';
+      }
+    };
+
+    canvas.addEventListener('click', ev=>{
+      const rect=canvas.getBoundingClientRect();
+      showTip(ev.clientX-rect.left, ev.clientY-rect.top, ev.clientX, ev.clientY);
+    });
+    canvas.addEventListener('touchend', ev=>{
+      ev.preventDefault();
+      const rect=canvas.getBoundingClientRect();
+      const t=ev.changedTouches[0];
+      showTip(t.clientX-rect.left, t.clientY-rect.top, t.clientX, t.clientY);
+    }, {passive:false});
+    document.addEventListener('click', ev=>{
+      if (!canvas.contains(ev.target)) tooltip.style.display='none';
+    });
+
+    // ダウンロード
+    const save = ev=>{ ev.preventDefault(); const a=document.createElement('a'); a.href=canvas.toDataURL('image/png'); a.download='psychro-compare.png'; a.click(); };
+    canvas.addEventListener('contextmenu', save);
+    canvas.addEventListener('dblclick', save);
+  }
+}
+
 function renderHistory(){
-  const list=document.getElementById('history-list');
-  if(!history.length){list.innerHTML='<div class="hist-empty">まだ履歴がありません</div>';return;}
-  const f=(v,d)=>Number(v).toFixed(d);
-  list.innerHTML=history.map(e=>{
-    const r=e.r;
-    return`<div class="hist-item">
+  const list = document.getElementById('history-list');
+
+  // 比較チャート表示切替
+  const compareWrap  = document.getElementById('hist-compare-wrap');
+  const compareEmpty = document.getElementById('hist-compare-empty');
+
+  if (!history.length) {
+    list.innerHTML = '<div class="hist-empty">まだ履歴がありません</div>';
+    compareWrap.style.display  = 'none';
+    compareEmpty.style.display = '';
+    document.getElementById('hist-sel-label').textContent = '';
+    return;
+  }
+
+  // histSelected を初期化（初回 or 全削除後）
+  if (histSelected.length === 0) {
+    // 古い順（reversedでindexが大きいほど古い）に最大5件
+    const oldest = history.slice().reverse().slice(0, 5);
+    histSelected = oldest.map(e => e.id);
+  }
+
+  // 選択ラベル更新
+  document.getElementById('hist-sel-label').textContent =
+    `チャートに表示：${histSelected.length} / 5 件　（タップで選択・解除）`;
+
+  const f = (v, d) => Number(v).toFixed(d);
+
+  list.innerHTML = history.map(e => {
+    const r = e.r;
+    const selPos  = histSelected.indexOf(e.id);   // タップ順インデックス
+    const isSel   = selPos >= 0;
+    const isFull  = histSelected.length >= 5 && !isSel;
+    const numChar = isSel ? HIST_NUMS[selPos] : '';
+    const color   = isSel ? HIST_COLORS[selPos] : 'transparent';
+
+    return `<div class="hist-item${isSel ? ' selected' : ''}${isFull ? ' sel-full' : ''}"
+      onclick="toggleHistSelect(${e.id})">
   <div class="hist-header">
+    <span class="hist-num" style="color:${color}">${numChar || '　'}</span>
     <span class="hist-title">${e.title}</span>
     <span class="hist-time">${e.ts}</span>
   </div>
@@ -768,25 +1163,235 @@ function renderHistory(){
     <div class="hist-cell"><span class="hk">WB </span><span class="hv">${f(r.WB,2)} ℃</span></div>
     <div class="hist-cell"><span class="hk">v  </span><span class="hv">${f(r.V,4)}</span></div>
   </div>
-  <div class="hist-actions">
+  <div class="hist-actions" onclick="event.stopPropagation()">
     <button class="hist-btn" onclick="loadEntry(${e.id})">↩ 読込</button>
     <button class="hist-btn del" onclick="deleteEntry(${e.id})">🗑 削除</button>
   </div>
 </div>`;
   }).join('');
+
+  // 比較チャート描画
+  compareWrap.style.display  = '';
+  compareEmpty.style.display = 'none';
+  requestAnimationFrame(() => renderCompareChart());
 }
 
+// ── Psychrometric Chart ───────────────────────────────────────────────────
+function drawChartOn(canvas, result, P) {
+  if (!canvas) return;
+
+  const dpr  = window.devicePixelRatio || 1;
+  const W_px = canvas.offsetWidth || 540;
+  const H_px = Math.round(W_px * 0.72);
+  canvas.width  = W_px * dpr;
+  canvas.height = H_px * dpr;
+  canvas.style.height = H_px + 'px';
+
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+
+  const ml = 30, mr = 30, mt = 22, mb = 38;
+  const cw = W_px - ml - mr;
+  const ch = H_px - mt - mb;
+
+  const DB_MIN = -15, DB_MAX = 50;
+  const W_MIN  = 0,   W_MAX  = 40;
+
+  function toX(db)    { return ml + (db - DB_MIN) / (DB_MAX - DB_MIN) * cw; }
+  function toY(w_gkg) { return mt + ch - (w_gkg - W_MIN) / (W_MAX - W_MIN) * ch; }
+
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0, 0, W_px, H_px);
+
+  ctx.strokeStyle = '#e4eaf2';
+  ctx.lineWidth = 0.5;
+  for (let db = DB_MIN; db <= DB_MAX; db += 5) {
+    const x = toX(db);
+    ctx.beginPath(); ctx.moveTo(x, mt); ctx.lineTo(x, mt + ch); ctx.stroke();
+  }
+  for (let w = 0; w <= W_MAX; w += 5) {
+    const y = toY(w);
+    ctx.beginPath(); ctx.moveTo(ml, y); ctx.lineTo(ml + cw, y); ctx.stroke();
+  }
+
+  const fs = Math.round(W_px * 0.021);
+
+  ctx.setLineDash([4, 3]);
+  ctx.lineWidth = 0.8;
+  const hVals = [-20, 0, 20, 40, 60, 80, 100, 120];
+  for (const h of hVals) {
+    ctx.strokeStyle = '#7ecdd6';
+    ctx.beginPath();
+    let started = false;
+    for (let db = DB_MIN; db <= DB_MAX + 0.1; db += 0.5) {
+      const denom = 2501 + 1.86 * db;
+      const w_gkg = (h - 1.006 * db) / denom * 1000;
+      const inRange = w_gkg >= W_MIN - 0.5 && w_gkg <= W_MAX + 0.5;
+      if (!inRange) { started = false; continue; }
+      const x = toX(db);
+      const y = toY(Math.max(W_MIN, Math.min(W_MAX, w_gkg)));
+      if (!started) { ctx.moveTo(x, y); started = true; } else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+    ctx.save();
+    ctx.setLineDash([]);
+    ctx.fillStyle = '#4aacb8';
+    ctx.font = `${fs}px IBM Plex Mono, monospace`;
+    const w_left = (h - 1.006 * DB_MIN) / (2501 + 1.86 * DB_MIN) * 1000;
+    if (w_left >= W_MIN + 0.5 && w_left <= W_MAX - 0.5) {
+      ctx.textAlign = 'left';
+      ctx.fillText(h, toX(DB_MIN) + 2, toY(w_left) - 2);
+    } else {
+      const dbAt0 = h / 1.006;
+      if (dbAt0 >= DB_MIN && dbAt0 <= DB_MAX) {
+        ctx.textAlign = 'center';
+        ctx.fillText(h, toX(dbAt0), toY(W_MIN) - 4);
+      }
+    }
+    ctx.restore();
+  }
+  ctx.setLineDash([]);
+
+  const rhVals = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100];
+  for (const rh of rhVals) {
+    const t = rh / 100;
+    const r = Math.round(26  + (180 - 26)  * (1 - t));
+    const g = Math.round(111 + (210 - 111) * (1 - t));
+    const b = Math.round(196 + (230 - 196) * (1 - t));
+    ctx.strokeStyle = `rgb(${r},${g},${b})`;
+    ctx.lineWidth = rh === 100 ? 1.6 : 0.9;
+    ctx.beginPath();
+    let started = false;
+    for (let db = DB_MIN; db <= DB_MAX + 0.1; db += 0.5) {
+      const pv = rh / 100 * psat(db);
+      if (pv >= P) { started = false; continue; }
+      const w_gkg = 0.62198 * pv / (P - pv) * 1000;
+      if (w_gkg > W_MAX + 0.5) { started = false; continue; }
+      const x = toX(db);
+      const y = toY(Math.min(W_MAX, w_gkg));
+      if (!started) { ctx.moveTo(x, y); started = true; } else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+    const pv_r = rh / 100 * psat(DB_MAX);
+    if (pv_r < P) {
+      const w_r = 0.62198 * pv_r / (P - pv_r) * 1000;
+      if (w_r >= W_MIN && w_r <= W_MAX) {
+        ctx.save();
+        ctx.fillStyle = `rgb(${r},${g},${b})`;
+        ctx.font = `${fs}px IBM Plex Mono, monospace`;
+        ctx.textAlign = 'left';
+        ctx.fillText(rh, toX(DB_MAX) + 3, toY(w_r) + 4);
+        ctx.restore();
+      }
+    }
+  }
+
+  ctx.strokeStyle = '#8a97a8';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(ml, mt, cw, ch);
+
+  ctx.fillStyle = '#4a5568';
+  ctx.font = `${fs}px IBM Plex Mono, monospace`;
+  ctx.textAlign = 'center';
+  for (let db = DB_MIN; db <= DB_MAX; db += 5) {
+    ctx.fillText(db, toX(db), mt + ch + 14);
+  }
+  ctx.font = `${Math.round(W_px * 0.024)}px Noto Sans JP, sans-serif`;
+  ctx.fillText('乾球温度 [℃]', ml + cw / 2, mt + ch + 30);
+
+  ctx.font = `${fs}px IBM Plex Mono, monospace`;
+  ctx.textAlign = 'right';
+  for (let w = 0; w <= W_MAX; w += 5) {
+    ctx.fillStyle = '#4a5568';
+    ctx.fillText(w, ml - 4, toY(w) + 4);
+  }
+  ctx.save();
+  ctx.translate(11, mt + ch / 2);
+  ctx.rotate(-Math.PI / 2);
+  ctx.textAlign = 'center';
+  ctx.font = `${Math.round(W_px * 0.024)}px Noto Sans JP, sans-serif`;
+  ctx.fillStyle = '#4a5568';
+  ctx.fillText("絶対湿度 [g/kg']", 0, 0);
+  ctx.restore();
+
+  ctx.save();
+  ctx.translate(W_px - 4, mt + ch / 2);
+  ctx.rotate(-Math.PI / 2);
+  ctx.textAlign = 'center';
+  ctx.font = `${Math.round(W_px * 0.024)}px Noto Sans JP, sans-serif`;
+  ctx.fillStyle = '#4a90b8';
+  ctx.fillText('相対湿度 [%]', 0, 0);
+  ctx.restore();
+
+  ctx.fillStyle = '#4aacb8';
+  ctx.font = `${fs}px Noto Sans JP, sans-serif`;
+  ctx.textAlign = 'left';
+  ctx.fillText('h [kJ/kg]', ml + 4, mt - 5);
+
+  if (result) {
+    const db  = result.DB;
+    const w_g = result.W * 1000;
+    if (db >= DB_MIN && db <= DB_MAX && w_g >= W_MIN && w_g <= W_MAX) {
+      const px = toX(db), py = toY(w_g);
+      ctx.beginPath();
+      ctx.arc(px, py, 8, 0, 2 * Math.PI);
+      ctx.fillStyle = 'rgba(26,111,196,0.18)';
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(px, py, 4.5, 0, 2 * Math.PI);
+      ctx.fillStyle = '#1a6fc4';
+      ctx.fill();
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+
+      const line1 = `${result.DB.toFixed(1)} ℃`;
+      const line2 = `${(result.W * 1000).toFixed(2)} g/kg'`;
+      const line3 = `RH ${result.RH.toFixed(1)} %`;
+      const lfs = Math.round(W_px * 0.027);
+      ctx.font = `bold ${lfs}px IBM Plex Mono, monospace`;
+      const tw = Math.max(
+        ctx.measureText(line1).width,
+        ctx.measureText(line2).width,
+        ctx.measureText(line3).width
+      );
+      const lh = lfs + 3;
+      const boxH = lh * 3 + 4;
+      let lx = px + 10, ly = py - lh * 2 - 2;
+      if (lx + tw + 8 > ml + cw - 2) lx = px - tw - 16;
+      if (ly < mt + 4) ly = py + 6;
+      ctx.fillStyle = 'rgba(255,255,255,0.88)';
+      ctx.fillRect(lx - 4, ly - lfs + 1, tw + 8, boxH);
+      ctx.fillStyle = '#1a3a6b';
+      ctx.fillText(line1, lx, ly);
+      ctx.fillText(line2, lx, ly + lh);
+      ctx.fillText(line3, lx, ly + lh * 2);
+    }
+  }
+  // 長押し / ダブルクリックでダウンロード
+  if (!canvas._dlBound) {
+    canvas._dlBound = true;
+    const saveCanvas = (e) => {
+      e.preventDefault();
+      const a = document.createElement('a');
+      a.href = canvas.toDataURL('image/png');
+      a.download = 'psychro-chart.png';
+      a.click();
+    };
+    canvas.addEventListener('contextmenu', saveCanvas);
+    canvas.addEventListener('dblclick', saveCanvas);
+  }
+}
+
+function updateChart() {
+  const canvas = document.getElementById('psychro-chart');
+  if (!canvas) return;
+  const P = parseFloat(document.getElementById('pressure').value) || 101.325;
+  drawChartOn(canvas, lastResult, P);
+}
 // init
 updateHistCount();
-</script>
-<script>
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js').catch(err => {
-      console.warn('SW registration failed:', err);
-    });
-  });
-}
+updateChart();
 </script>
 </body>
 </html>
