@@ -1,4 +1,4 @@
-const CACHE_NAME = 'psychro-v1';
+const CACHE_NAME = 'psychro-v2';
 
 const PRECACHE = [
   './',
@@ -11,7 +11,6 @@ const PRECACHE = [
 const NETWORK_FIRST_PATTERNS = [
   /googleapis\.com/,
   /gstatic\.com/,
-  /fonts\.googleapis/,
 ];
 
 self.addEventListener('install', e => {
@@ -32,14 +31,10 @@ self.addEventListener('activate', e => {
 
 self.addEventListener('fetch', e => {
   const url = e.request.url;
-
   if (NETWORK_FIRST_PATTERNS.some(p => p.test(url))) {
-    e.respondWith(
-      fetch(e.request).catch(() => caches.match(e.request))
-    );
+    e.respondWith(fetch(e.request).catch(() => caches.match(e.request)));
     return;
   }
-
   e.respondWith(
     caches.match(e.request).then(cached => {
       if (cached) return cached;
