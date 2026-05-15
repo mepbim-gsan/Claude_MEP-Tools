@@ -9,7 +9,6 @@
 | ファイル | 説明 |
 |---|---|
 | `index.html` | ツール本体（単体HTMLで動作） |
-| `psychro.html` | 空気線図単体ページ |
 | `manifest.json` | PWAマニフェスト（ホーム画面追加対応） |
 | `sw.js` | Service Worker（オフライン対応） |
 | `icons/` | PWAアイコン（192px・512px） |
