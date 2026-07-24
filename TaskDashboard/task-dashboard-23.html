@@ -1,0 +1,1560 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DD-MEP タスク管理ダッシュボード</title>
+<style>
+  :root{
+    --bg:#f5f6f8;
+    --card:#ffffff;
+    --border:#e2e5ea;
+    --text:#1c2128;
+    --sub:#6b7280;
+    --accent:#2563eb;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Hiragino Sans","Yu Gothic",sans-serif;
+    background:var(--bg);
+    color:var(--text);
+    padding:12px;
+  }
+  h1{
+    font-size:1.15rem;
+    margin:4px 0 12px;
+  }
+  .card{
+    background:var(--card);
+    border:1px solid var(--border);
+    border-radius:10px;
+    padding:14px;
+    margin-bottom:12px;
+  }
+  .loader{
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+  }
+  .loader input[type=file]{
+    font-size:0.9rem;
+  }
+  .loader .hint{
+    font-size:0.78rem;
+    color:var(--sub);
+  }
+
+  /* タブ */
+  .tabs{
+    display:flex;
+    flex-wrap:wrap;
+    gap:6px;
+    margin-bottom:12px;
+    border-bottom:1px solid var(--border);
+  }
+  .tab-btn{
+    appearance:none;
+    border:none;
+    background:none;
+    padding:8px 12px;
+    font-size:0.85rem;
+    font-weight:600;
+    color:var(--sub);
+    cursor:pointer;
+    border-bottom:2px solid transparent;
+    margin-bottom:-1px;
+  }
+  .tab-btn.active{
+    color:var(--accent);
+    border-bottom-color:var(--accent);
+  }
+  .view{ display:none; }
+  .view.active{ display:block; }
+
+  .summary{
+    display:flex;
+    flex-wrap:wrap;
+    gap:8px;
+  }
+  .summary-mode-toggle{
+    display:flex;
+    gap:6px;
+    margin-bottom:8px;
+  }
+  .mode-btn{
+    appearance:none;
+    border:1px solid var(--border);
+    border-radius:999px;
+    padding:5px 12px;
+    font-size:0.78rem;
+    font-weight:600;
+    background:#fff;
+    color:var(--sub);
+    cursor:pointer;
+  }
+  .mode-btn.active{
+    background:var(--accent);
+    border-color:var(--accent);
+    color:#fff;
+  }
+  .summary .stat{
+    flex:1 1 90px;
+    background:#fafbfc;
+    border:1px solid var(--border);
+    border-radius:8px;
+    padding:8px 10px;
+    text-align:center;
+  }
+  .summary .stat .num{
+    font-size:1.3rem;
+    font-weight:700;
+  }
+  .summary .stat .label{
+    font-size:0.72rem;
+    color:var(--sub);
+    margin-top:2px;
+  }
+  .stat-toggle{
+    cursor:pointer;
+    transition:border-color .15s, background .15s;
+  }
+  .stat-toggle:hover{
+    border-color:var(--accent);
+  }
+  .stat-toggle.active{
+    background:#eaf1ff;
+    border-color:var(--accent);
+  }
+  .stat-toggle.active .label{
+    color:var(--accent);
+    font-weight:600;
+  }
+  .stat-toggle.partial{
+    background:#fff7ed;
+    border:1px dashed #d97706;
+  }
+  .stat-toggle.partial .label{
+    color:#b45309;
+    font-weight:600;
+  }
+  .partial-note{
+    font-size:0.65rem;
+    color:#b45309;
+    margin-top:1px;
+  }
+
+  .chart-wrap{ position:relative; }
+  .bar-chart-title{
+    font-size:0.85rem;
+    font-weight:700;
+    margin:0 0 4px;
+    color:var(--text);
+  }
+  .bar-chart-sub{
+    font-size:0.72rem;
+    color:var(--accent);
+    margin:0 0 10px;
+    min-height:1em;
+  }
+  .bar-chart-sub .clear{
+    text-decoration:underline;
+    cursor:pointer;
+  }
+  .bar-row{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    margin-bottom:6px;
+    font-size:0.78rem;
+    cursor:pointer;
+    border-radius:6px;
+    padding:2px 4px;
+    margin-left:-4px;
+  }
+  .bar-row:hover{ background:#f3f4f6; }
+  .bar-row.active{ background:#eaf1ff; }
+  .bar-row .bar-label{
+    flex:0 0 84px;
+    text-align:right;
+    color:var(--sub);
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+  }
+  .bar-row .bar-track{
+    flex:1 1 auto;
+    background:#f0f1f4;
+    border-radius:4px;
+    height:16px;
+    position:relative;
+    overflow:hidden;
+  }
+  .bar-row .bar-fill{
+    height:100%;
+    border-radius:4px;
+    min-width:2px;
+  }
+  .bar-row .bar-value{
+    flex:0 0 30px;
+    font-weight:600;
+    font-variant-numeric:tabular-nums;
+  }
+
+  .role-table{
+    font-size:0.78rem;
+  }
+  .role-table tbody tr.role-row{
+    cursor:pointer;
+  }
+  .role-table tbody tr.role-row:hover{
+    background:#f7f9fb;
+  }
+  .role-table th:not(:first-child), .role-table td:not(:first-child){
+    text-align:center;
+    width:76px;
+  }
+  .role-name{
+    cursor:pointer;
+    font-weight:600;
+    border-radius:6px;
+    padding:2px 5px;
+    margin-left:-5px;
+    display:inline-block;
+  }
+  .role-name:hover{ background:#eaf1ff; }
+  .role-name.active{
+    background:#2563eb;
+    color:#fff;
+  }
+  .role-bar-cell{
+    border-radius:4px;
+  }
+  .role-badge{
+    appearance:none;
+    border:1px solid var(--border);
+    border-radius:999px;
+    background:#fff;
+    color:var(--sub);
+    font-size:0.72rem;
+    font-weight:700;
+    padding:2px 8px;
+    cursor:pointer;
+  }
+  .role-badge:hover{ border-color:var(--accent); color:var(--accent); }
+  .role-badge.active{
+    background:var(--accent);
+    border-color:var(--accent);
+    color:#fff;
+  }
+  .role-badge.zero{
+    opacity:0.3;
+    cursor:default;
+    pointer-events:none;
+    border-color:transparent;
+    background:transparent;
+  }
+
+  .filters{
+    display:flex;
+    gap:8px;
+    flex-wrap:wrap;
+    margin-bottom:10px;
+  }
+  .filters select{
+    flex:1 1 120px;
+    padding:6px 8px;
+    border:1px solid var(--border);
+    border-radius:6px;
+    font-size:0.85rem;
+    background:#fff;
+  }
+  .filters .reset-btn{
+    flex:0 0 auto;
+    padding:6px 10px;
+    border:1px solid var(--border);
+    border-radius:6px;
+    background:#fff;
+    font-size:0.8rem;
+    color:var(--sub);
+    cursor:pointer;
+  }
+
+  table{
+    width:100%;
+    border-collapse:collapse;
+    font-size:0.8rem;
+  }
+  th,td{
+    text-align:left;
+    padding:6px 6px;
+    border-bottom:1px solid var(--border);
+    vertical-align:top;
+  }
+  th{
+    color:var(--sub);
+    font-weight:600;
+    position:sticky;
+    top:0;
+    background:var(--card);
+    white-space:nowrap;
+  }
+  th.sortable{ cursor:pointer; user-select:none; }
+  th.sortable:hover{ color:var(--accent); }
+  td.title a{
+    color:var(--accent);
+    text-decoration:none;
+  }
+  .edit-link{
+    text-decoration:none;
+    font-size:0.9rem;
+    opacity:0.7;
+  }
+  .edit-link:hover{ opacity:1; }
+  .badge{
+    display:inline-block;
+    padding:2px 7px;
+    border-radius:999px;
+    font-size:0.72rem;
+    color:#fff;
+    white-space:nowrap;
+  }
+  .table-wrap{
+    max-height:440px;
+    overflow:auto;
+  }
+  .empty{
+    color:var(--sub);
+    font-size:0.85rem;
+    text-align:center;
+    padding:20px 0;
+  }
+
+  /* マトリクスビュー */
+  .matrix-table td, .matrix-table th{ text-align:center; }
+  .matrix-table td:first-child, .matrix-table th:first-child{ text-align:left; }
+  .matrix-cell{
+    appearance:none;
+    border:none;
+    background:#eef2f7;
+    border-radius:6px;
+    padding:4px 8px;
+    font-size:0.8rem;
+    font-weight:600;
+    color:var(--text);
+    cursor:pointer;
+    min-width:32px;
+  }
+  .matrix-cell:hover{ background:#dbe6f7; }
+  .matrix-zero{ color:#c4c8cf; font-size:0.78rem; }
+  .view-hint{
+    font-size:0.78rem;
+    color:var(--sub);
+    margin:0 0 10px;
+  }
+
+  /* 担当者ボード */
+  #ownerSelect{
+    width:100%;
+    padding:8px 10px;
+    border:1px solid var(--border);
+    border-radius:8px;
+    font-size:0.88rem;
+    background:#fff;
+    margin-bottom:10px;
+  }
+  .status-toggle{
+    display:flex;
+    flex-wrap:wrap;
+    gap:6px;
+  }
+  .status-chip{
+    appearance:none;
+    border:1px solid var(--border);
+    border-radius:999px;
+    padding:4px 10px;
+    font-size:0.72rem;
+    font-weight:600;
+    cursor:pointer;
+    background:#fff;
+    color:var(--text);
+    display:flex;
+    align-items:center;
+    gap:5px;
+  }
+  .status-chip .dot{
+    width:8px;
+    height:8px;
+    border-radius:50%;
+    display:inline-block;
+  }
+  .status-chip.hidden{
+    opacity:0.4;
+    text-decoration:line-through;
+  }
+
+  .board-owner-title{
+    font-size:1rem;
+    margin:0 0 10px;
+  }
+  .board-section-title{
+    font-size:0.82rem;
+    font-weight:600;
+    margin:14px 0 6px;
+    display:flex;
+    align-items:center;
+    gap:6px;
+  }
+  .board-cards{
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+  }
+  .task-card{
+    border:1px solid var(--border);
+    border-left:3px solid var(--accent);
+    border-radius:8px;
+    padding:8px 10px;
+    background:#fafbfc;
+  }
+  .task-card-title a{
+    color:var(--text);
+    text-decoration:none;
+    font-size:0.85rem;
+    font-weight:600;
+  }
+  .task-card-meta{
+    display:flex;
+    flex-wrap:wrap;
+    gap:10px;
+    font-size:0.72rem;
+    color:var(--sub);
+    margin-top:4px;
+  }
+  .task-card-meta .deadline{
+    color:#b91c1c;
+    font-weight:600;
+  }
+  .done-details{
+    margin-top:16px;
+  }
+  .done-details summary{
+    cursor:pointer;
+    font-size:0.85rem;
+    font-weight:600;
+    color:var(--sub);
+    padding:6px 0;
+  }
+  .done-details .task-card{
+    border-left-color:#9ca3af;
+    opacity:0.8;
+  }
+
+  /* 設定タブ */
+  .settings-section-title{
+    font-size:0.9rem;
+    margin:0 0 6px;
+  }
+  .settings-actions{
+    display:flex;
+    flex-wrap:wrap;
+    gap:8px;
+  }
+  .settings-file-btn{
+    display:inline-flex;
+    align-items:center;
+    padding:6px 10px;
+    border:1px solid var(--border);
+    border-radius:6px;
+    background:#fff;
+    font-size:0.8rem;
+    color:var(--sub);
+    cursor:pointer;
+  }
+  .group-manage-list{
+    display:flex;
+    flex-direction:column;
+    gap:4px;
+    margin-bottom:10px;
+  }
+  .group-manage-row{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:8px;
+    padding:5px 8px;
+    background:#f7f9fb;
+    border-radius:6px;
+    font-size:0.8rem;
+    font-weight:600;
+  }
+  .group-manage-row .rename-btn{
+    appearance:none;
+    border:1px solid var(--border);
+    border-radius:6px;
+    background:#fff;
+    font-size:0.72rem;
+    padding:3px 8px;
+    cursor:pointer;
+    color:var(--sub);
+    font-weight:600;
+  }
+  .group-manage-actions{
+    display:flex;
+    gap:4px;
+  }
+  .move-btn{
+    appearance:none;
+    border:1px solid var(--border);
+    border-radius:6px;
+    background:#fff;
+    font-size:0.7rem;
+    width:24px;
+    height:24px;
+    cursor:pointer;
+    color:var(--sub);
+  }
+  .move-btn:disabled{
+    opacity:0.3;
+    cursor:default;
+  }
+  .move-btn:hover:not(:disabled){
+    border-color:var(--accent);
+    color:var(--accent);
+  }
+  .status-group-row{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    padding:6px 0;
+    border-bottom:1px solid var(--border);
+    font-size:0.82rem;
+  }
+  .status-group-row:last-child{ border-bottom:none; }
+  .status-group-row .dot{
+    width:9px;
+    height:9px;
+    border-radius:50%;
+    flex:0 0 auto;
+  }
+  .status-group-row .status-name{
+    flex:1 1 auto;
+  }
+  .status-group-row select{
+    flex:0 0 160px;
+    padding:5px 6px;
+    border:1px solid var(--border);
+    border-radius:6px;
+    font-size:0.8rem;
+    background:#fff;
+  }
+  .hidden-people-list{
+    display:flex;
+    flex-wrap:wrap;
+    gap:8px;
+  }
+  .hidden-people-list label{
+    display:flex;
+    align-items:center;
+    gap:5px;
+    font-size:0.8rem;
+    border:1px solid var(--border);
+    border-radius:999px;
+    padding:4px 10px;
+    cursor:pointer;
+  }
+  .hidden-people-list input{
+    margin:0;
+  }
+</style>
+</head>
+<body>
+
+<h1>DD-MEP タスク管理ダッシュボード</h1>
+
+<div class="card loader">
+  <label for="fileInput"><strong>JSONファイルを読み込み</strong>（複数リストを同時選択すると統合表示できます）</label>
+  <input type="file" id="fileInput" accept=".json" multiple>
+  <div class="hint">本番運用時は SharePoint ドキュメントライブラリから自動取得する方式に切り替え予定です。</div>
+</div>
+
+<div id="dashboard" style="display:none;">
+
+  <div class="tabs">
+    <button class="tab-btn active" data-view="viewList">一覧</button>
+    <button class="tab-btn" data-view="viewGroup">チャネル別</button>
+    <button class="tab-btn" data-view="viewOwner">担当者別</button>
+    <button class="tab-btn" data-view="viewSettings">設定</button>
+  </div>
+
+  <!-- 一覧タブ -->
+  <div class="view active" id="viewList">
+
+    <div class="summary-mode-toggle" id="summaryModeToggle">
+      <button type="button" class="mode-btn active" data-mode="group">グループ別</button>
+      <button type="button" class="mode-btn" data-mode="status">ステータス別</button>
+    </div>
+    <div class="card summary" id="summaryCards"></div>
+
+    <div class="card">
+      <p class="view-hint">名前をタップすると担当者・関係者・投稿者をまとめて絞り込みます。各件数バッジは個別にON/OFFできます。</p>
+      <div class="table-wrap" style="max-height:360px;">
+        <table class="role-table">
+          <thead>
+            <tr><th>氏名</th><th>担当</th><th>関係</th><th>投稿</th></tr>
+          </thead>
+          <tbody id="rolePanelBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="filters">
+        <select id="channelFilter"><option value="">チャネル：すべて</option></select>
+        <select id="listSourceFilter"><option value="">リスト：すべて</option></select>
+        <button class="reset-btn" id="resetFilters">条件クリア</button>
+      </div>
+      <p class="view-hint">ステータスは上のサマリーカードをクリックして絞り込みます（複数選択可）。</p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>タイトル</th>
+              <th></th>
+              <th>ステータス</th>
+              <th>担当者</th>
+              <th>関係者</th>
+              <th>投稿者</th>
+              <th>チャネル</th>
+              <th class="sortable" data-sort="date">投稿日<span id="sortMarkDate"></span></th>
+              <th class="sortable" data-sort="modified">更新日<span id="sortMarkModified"></span></th>
+            </tr>
+          </thead>
+          <tbody id="tableBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- チャネル別タブ -->
+  <div class="view" id="viewGroup">
+    <div class="card">
+      <p class="view-hint">チャネルごとのステータス件数です。セルをクリックすると一覧タブで絞り込み表示します。</p>
+      <div id="groupMatrix"></div>
+    </div>
+  </div>
+
+  <!-- 担当者別タブ（タスクボード） -->
+  <div class="view" id="viewOwner">
+    <div class="card">
+      <p class="view-hint">担当者を選ぶと、その人の未完了タスクを優先表示します。完了タスクは折りたたみ表示です。</p>
+      <select id="ownerSelect"><option value="">担当者を選択してください</option></select>
+      <div class="status-toggle" id="statusToggle"></div>
+    </div>
+    <div class="card" id="ownerBoardDetail"></div>
+  </div>
+
+  <!-- 設定タブ -->
+  <div class="view" id="viewSettings">
+    <div class="card">
+      <p class="view-hint">Setting.json（チーム共有）＋ブラウザの個人設定（このブラウザだけの上書き）の二層構成です。ここでの変更は自動的にこのブラウザに保存されます。</p>
+      <div class="settings-actions">
+        <label class="settings-file-btn">
+          Setting.jsonを読み込み
+          <input type="file" id="settingsFileInput" accept=".json" style="display:none;">
+        </label>
+        <button class="reset-btn" id="exportSettingsBtn">Setting.jsonをダウンロード</button>
+        <button class="reset-btn" id="resetLocalSettingsBtn">個人上書きをリセット</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3 class="settings-section-title">① ステータスのグループ化</h3>
+      <p class="view-hint">各ステータスの所属グループを選びます。同じグループのステータスは一覧のサマリーカードでまとめて表示・一括ON/OFFできます。</p>
+      <div id="groupManagement" class="group-manage-list"></div>
+      <div id="statusGroupSettings"></div>
+    </div>
+
+    <div class="card">
+      <h3 class="settings-section-title">② 表示しない人（退職済みなど）</h3>
+      <p class="view-hint">チェックした人は選択肢から消えます。担当タスクは「(未設定)」として扱われ、データ自体は消えません。</p>
+      <div class="hidden-people-list" id="hiddenPeopleSettings"></div>
+    </div>
+
+    <div class="card">
+      <h3 class="settings-section-title">③ 一覧タブの初期ステータス絞り込み</h3>
+      <p class="view-hint">一覧タブを開いたときに、最初からONにしておくステータス（サマリーカード）を選びます。</p>
+      <div class="hidden-people-list" id="defaultStatusSetting"></div>
+    </div>
+  </div>
+
+</div>
+
+<div id="emptyState" class="empty">JSONファイルを選択してください</div>
+
+<script>
+let rawItems = [];
+let sortState = { key: 'date', dir: 'desc' };
+let activeStatuses = new Set();
+let activeRoleTags = new Set(); // 例: "owner:氏名", "member:氏名", "author:氏名"
+let selectedOwner = null;
+let summaryViewMode = 'group'; // 'group' または 'status'
+let hiddenStatuses = new Set();
+
+// 設定：Setting.json（基本）＋ localStorage（個人上書き）の二層構成
+// statusGroupMap: { "ステータス名": "グループ名" }
+// hiddenPeople: ["表示しない人の名前", ...]
+let settings = { statusGroupMap: {}, hiddenPeople: [], groupOrder: [], defaultStatuses: [] };
+let baseSettingsFromFile = { statusGroupMap: {}, hiddenPeople: [], groupOrder: [], defaultStatuses: [] };
+const SETTINGS_LS_KEY = 'ddmepDashboardSettingsOverride';
+
+// ここに含まれるステータスは「完了扱い」として担当者ボードで折りたたみ表示します
+const RESOLVED_STATUSES = ['完了'];
+
+// リストごとの編集リンク設定（_sourceList のファイル名部分をキーにする）
+// site: SharePointサイトURL, listId: リストのGUID
+// 未設定のリストは編集リンクを表示しません
+const EDIT_LINK_CONFIG = {
+  ddmep_team: {
+    site: '', // 例: 'https://testcloud.sharepoint.com/sites/mep'
+    listId: '' // 例: 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'
+  }
+  // 別のリストを追加する場合はここに追記
+  // core_members_list: { site: '...', listId: '...' }
+};
+
+function getEditUrl(item){
+  const config = EDIT_LINK_CONFIG[item._sourceList];
+  if(!config || !config.site || !config.listId || !item.id) return null;
+  return `${config.site}/_layouts/15/listform.aspx?PageType=6&ListId=${config.listId}&ID=${item.id}`;
+}
+
+const COLOR_PALETTE = [
+  '#2563eb', '#16a34a', '#f59e0b', '#dc2626', '#7c3aed',
+  '#0891b2', '#db2777', '#65a30d', '#ea580c', '#4f46e5'
+];
+
+// 生データからそのまま取り出す（設定タブでの一覧表示用、非表示フィルタなし）
+function rawMemberNames(item){
+  if(!Array.isArray(item.members)) return [];
+  return item.members.map(m => m.DisplayName).filter(Boolean);
+}
+
+// 「表示しない人」設定を適用した担当者/投稿者/関係者の取得（アプリ本体で使用）
+function isHiddenPerson(name){
+  return settings.hiddenPeople.includes(name);
+}
+function getOwnerName(item){
+  const name = item.owner || '(未設定)';
+  return isHiddenPerson(name) ? '(未設定)' : name;
+}
+function getAuthorName(item){
+  const name = item.author || '(未設定)';
+  return isHiddenPerson(name) ? '(未設定)' : name;
+}
+function getMemberNames(item){
+  return rawMemberNames(item).filter(n => !isHiddenPerson(n) && n !== item.owner);
+}
+
+const statusColorMap = {};
+function colorForStatus(status){
+  if(!statusColorMap[status]){
+    const idx = Object.keys(statusColorMap).length % COLOR_PALETTE.length;
+    statusColorMap[status] = COLOR_PALETTE[idx];
+  }
+  return statusColorMap[status];
+}
+
+document.getElementById('fileInput').addEventListener('change', function(e){
+  const files = [...e.target.files];
+  if(!files.length) return;
+
+  const settingFiles = files.filter(f => /^setting\.json$/i.test(f.name));
+  const dataFiles = files.filter(f => !/^setting\.json$/i.test(f.name));
+
+  Promise.all([
+    Promise.all(dataFiles.map(readJsonFile)),
+    settingFiles.length ? readSettingsFile(settingFiles[settingFiles.length - 1]) : Promise.resolve(null)
+  ]).then(([dataResults, loadedSettings]) => {
+    rawItems = dataResults.flat();
+    if(loadedSettings) baseSettingsFromFile = normalizeSettings(loadedSettings);
+    applySettingsMerge();
+    init();
+  }).catch(err => alert('JSONの解析に失敗しました: ' + err.message));
+});
+
+document.getElementById('settingsFileInput').addEventListener('change', function(e){
+  const file = e.target.files[0];
+  if(!file) return;
+  readSettingsFile(file).then(loadedSettings => {
+    baseSettingsFromFile = normalizeSettings(loadedSettings);
+    applySettingsMerge();
+    if(rawItems.length){
+      buildFilters();
+      setupOwnerBoardControls();
+      renderSettingsTab();
+      renderAll();
+    }
+  }).catch(err => alert('Setting.jsonの読み込みに失敗しました: ' + err.message));
+});
+
+document.getElementById('exportSettingsBtn').addEventListener('click', () => {
+  const blob = new Blob([JSON.stringify(settings, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'Setting.json';
+  a.click();
+  URL.revokeObjectURL(url);
+});
+
+document.getElementById('resetLocalSettingsBtn').addEventListener('click', () => {
+  localStorage.removeItem(SETTINGS_LS_KEY);
+  applySettingsMerge();
+  if(rawItems.length){
+    buildFilters();
+    setupOwnerBoardControls();
+    renderSettingsTab();
+    renderAll();
+  }
+});
+
+function readSettingsFile(file){
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = evt => {
+      try{ resolve(JSON.parse(evt.target.result)); }
+      catch(err){ reject(err); }
+    };
+    reader.onerror = () => reject(new Error(`${file.name} の読み込みに失敗しました`));
+    reader.readAsText(file, 'utf-8');
+  });
+}
+
+function normalizeSettings(obj){
+  return {
+    statusGroupMap: (obj && typeof obj.statusGroupMap === 'object' && obj.statusGroupMap) || {},
+    hiddenPeople: (obj && Array.isArray(obj.hiddenPeople)) ? obj.hiddenPeople : [],
+    groupOrder: (obj && Array.isArray(obj.groupOrder)) ? obj.groupOrder : [],
+    defaultStatuses: (obj && Array.isArray(obj.defaultStatuses)) ? obj.defaultStatuses : []
+  };
+}
+
+// groupOrderを現在存在するグループと同期（削除されたグループを除去、新規グループを末尾に追加）
+function syncGroupOrder(){
+  const existingGroups = [...new Set(Object.values(settings.statusGroupMap))];
+  let order = (settings.groupOrder || []).filter(g => existingGroups.includes(g));
+  existingGroups.forEach(g => { if(!order.includes(g)) order.push(g); });
+  settings.groupOrder = order;
+}
+
+// グループ順→(未設定)優先→件数順（チャネル別マトリクスと共通のロジック）
+function statusDisplayComparator(countsMap){
+  return (a, b) => {
+    const ga = settings.statusGroupMap[a];
+    const gb = settings.statusGroupMap[b];
+    const idxA = ga ? settings.groupOrder.indexOf(ga) : Infinity;
+    const idxB = gb ? settings.groupOrder.indexOf(gb) : Infinity;
+    if(idxA !== idxB) return idxA - idxB;
+    if(a === '(未設定)') return -1;
+    if(b === '(未設定)') return 1;
+    if(countsMap) return (countsMap[b] || 0) - (countsMap[a] || 0);
+    return 0;
+  };
+}
+
+function loadLocalOverride(){
+  try{
+    const raw = localStorage.getItem(SETTINGS_LS_KEY);
+    return raw ? normalizeSettings(JSON.parse(raw)) : null;
+  }catch(err){
+    return null;
+  }
+}
+
+function saveLocalOverride(){
+  try{
+    localStorage.setItem(SETTINGS_LS_KEY, JSON.stringify(settings));
+  }catch(err){
+    console.error('個人設定の保存に失敗しました', err);
+  }
+}
+
+function applySettingsMerge(){
+  const override = loadLocalOverride();
+  settings = override || normalizeSettings(baseSettingsFromFile);
+}
+
+function onSettingsChanged(){
+  saveLocalOverride();
+  buildFilters();
+  setupOwnerBoardControls();
+  renderSettingsTab();
+  renderAll();
+}
+
+function readJsonFile(file){
+  const sourceLabel = file.name.replace(/\.json$/i, '');
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = evt => {
+      try{
+        const json = JSON.parse(evt.target.result);
+        const items = Array.isArray(json) ? json : (json.body || json.value || []);
+        items.forEach(i => { i._sourceList = sourceLabel; });
+        resolve(items);
+      }catch(err){
+        reject(err);
+      }
+    };
+    reader.onerror = () => reject(new Error(`${file.name} の読み込みに失敗しました`));
+    reader.readAsText(file, 'utf-8');
+  });
+}
+
+function init(){
+  document.getElementById('emptyState').style.display = 'none';
+  document.getElementById('dashboard').style.display = 'block';
+  const existingStatuses = new Set(rawItems.map(i => i.status || '(未設定)'));
+  activeStatuses = new Set(settings.defaultStatuses.filter(s => existingStatuses.has(s)));
+  activeRoleTags = new Set();
+  selectedOwner = null;
+  hiddenStatuses = new Set();
+  summaryViewMode = 'group';
+  buildFilters();
+  setupTabs();
+  setupSortableHeaders();
+  setupOwnerBoardControls();
+  setupSummaryModeToggle();
+  setupDefaultStatusSetting();
+  renderSettingsTab();
+  document.getElementById('resetFilters').addEventListener('click', () => {
+    ['channelFilter','listSourceFilter'].forEach(id => document.getElementById(id).value = '');
+    activeStatuses = new Set();
+    activeRoleTags = new Set();
+    renderAll();
+  });
+  renderAll();
+}
+
+/* ---------- タブ切替 ---------- */
+function setupTabs(){
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => showView(btn.dataset.view));
+  });
+}
+function showView(name){
+  document.querySelectorAll('.view').forEach(v => v.classList.toggle('active', v.id === name));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.view === name));
+}
+
+/* ---------- フィルタ ---------- */
+function buildFilters(){
+  const channels = [...new Set(rawItems.map(i => i.channel || '(未設定)'))].sort();
+  const listSources = [...new Set(rawItems.map(i => i._sourceList || '(未設定)'))].sort();
+
+  fillSelect('channelFilter', 'チャネル：すべて', channels);
+  fillSelect('listSourceFilter', 'リスト：すべて', listSources);
+
+  ['channelFilter','listSourceFilter'].forEach(id =>
+    document.getElementById(id).addEventListener('change', renderAll)
+  );
+}
+function fillSelect(id, allLabel, values){
+  const sel = document.getElementById(id);
+  sel.innerHTML = `<option value="">${allLabel}</option>` +
+    values.map(v => `<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join('');
+}
+
+function getFiltered(options){
+  const exclude = (options && options.exclude) || [];
+  const channel = document.getElementById('channelFilter').value;
+  const listSource = document.getElementById('listSourceFilter').value;
+  return rawItems.filter(i => {
+    const status = i.status || '(未設定)';
+    const owner = getOwnerName(i);
+    if(!exclude.includes('status') && activeStatuses.size && !activeStatuses.has(status)) return false;
+    if(!exclude.includes('channel') && channel && (i.channel || '(未設定)') !== channel) return false;
+    if(!exclude.includes('listSource') && listSource && (i._sourceList || '(未設定)') !== listSource) return false;
+    if(!exclude.includes('roleTags') && activeRoleTags.size){
+      const matches = [...activeRoleTags].some(tag => {
+        const sep = tag.indexOf(':');
+        const role = tag.slice(0, sep);
+        const name = tag.slice(sep + 1);
+        if(role === 'owner') return owner === name;
+        if(role === 'author') return getAuthorName(i) === name;
+        if(role === 'member'){
+          if(name === '(未設定)') return getMemberNames(i).length === 0;
+          return getMemberNames(i).includes(name);
+        }
+        return false;
+      });
+      if(!matches) return false;
+    }
+    return true;
+  });
+}
+
+/* ---------- 描画 ---------- */
+function renderAll(){
+  const items = getFiltered();
+  renderSummary(items, getFiltered({exclude:['status']}));
+  renderTable(items);
+  renderRolePanel();
+  renderMatrix('groupMatrix', 'channel', 'チャネル', getFiltered({exclude:['channel']}), 'name');
+  renderOwnerBoard();
+}
+
+function renderRolePanel(){
+  const baseItems = getFiltered({ exclude: ['roleTags'] });
+  const peopleMap = {}; // name -> { owner, member, author }
+  function bump(name, role){
+    if(!name || name === '(未設定)') return;
+    if(!peopleMap[name]) peopleMap[name] = { owner: 0, member: 0, author: 0 };
+    peopleMap[name][role]++;
+  }
+  baseItems.forEach(i => {
+    bump(getOwnerName(i), 'owner');
+    bump(getAuthorName(i), 'author');
+    getMemberNames(i).forEach(m => bump(m, 'member'));
+  });
+
+  const people = Object.entries(peopleMap)
+    .map(([name, c]) => ({ name, ...c }))
+    .sort((a, b) => b.owner - a.owner || a.name.localeCompare(b.name, 'ja'));
+
+  const unsetRow = {
+    name: '(未設定)',
+    owner: baseItems.filter(i => getOwnerName(i) === '(未設定)').length,
+    member: baseItems.filter(i => getMemberNames(i).length === 0).length,
+    author: baseItems.filter(i => getAuthorName(i) === '(未設定)').length
+  };
+  people.unshift(unsetRow);
+
+  const maxOwner = Math.max(1, ...people.map(p => p.owner));
+  const maxMember = Math.max(1, ...people.map(p => p.member));
+  const maxAuthor = Math.max(1, ...people.map(p => p.author));
+
+  const tbody = document.getElementById('rolePanelBody');
+  tbody.innerHTML = people.map(p => {
+    const nameActive = ['owner','member','author'].every(role => activeRoleTags.has(`${role}:${p.name}`));
+    const cell = (role, count, max) => {
+      const isActive = activeRoleTags.has(`${role}:${p.name}`);
+      const zeroClass = count === 0 ? ' zero' : '';
+      const pct = Math.round((count / max) * 100);
+      const bg = count > 0 ? `background:linear-gradient(to right, #dbe6f7 ${pct}%, transparent ${pct}%);` : '';
+      return `<td class="role-bar-cell" style="${bg}"><button type="button" class="role-badge${isActive ? ' active' : ''}${zeroClass}" data-tag="${role}:${escapeHtml(p.name)}">${count}</button></td>`;
+    };
+    return `<tr data-name="${escapeHtml(p.name)}" class="role-row">
+      <td><span class="role-name${nameActive ? ' active' : ''}" data-name="${escapeHtml(p.name)}">${escapeHtml(p.name)}</span></td>
+      ${cell('owner', p.owner, maxOwner)}
+      ${cell('member', p.member, maxMember)}
+      ${cell('author', p.author, maxAuthor)}
+    </tr>`;
+  }).join('') || '<tr><td colspan="4" class="empty">データがありません</td></tr>';
+
+  function toggleNameTags(name){
+    const tags = ['owner', 'member', 'author'].map(role => `${role}:${name}`);
+    const allActive = tags.every(t => activeRoleTags.has(t));
+    tags.forEach(t => { if(allActive) activeRoleTags.delete(t); else activeRoleTags.add(t); });
+    renderAll();
+  }
+
+  tbody.querySelectorAll('tr.role-row').forEach(tr => {
+    tr.addEventListener('click', e => {
+      if(e.target.closest('.role-badge')) return;
+      toggleNameTags(tr.dataset.name);
+    });
+  });
+  tbody.querySelectorAll('.role-badge:not(.zero)').forEach(el => {
+    el.addEventListener('click', () => {
+      const tag = el.dataset.tag;
+      if(activeRoleTags.has(tag)) activeRoleTags.delete(tag); else activeRoleTags.add(tag);
+      renderAll();
+    });
+  });
+}
+function setupSummaryModeToggle(){
+  document.querySelectorAll('#summaryModeToggle .mode-btn').forEach(b =>
+    b.classList.toggle('active', b.dataset.mode === summaryViewMode)
+  );
+  document.querySelectorAll('#summaryModeToggle .mode-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      summaryViewMode = btn.dataset.mode;
+      document.querySelectorAll('#summaryModeToggle .mode-btn').forEach(b =>
+        b.classList.toggle('active', b.dataset.mode === summaryViewMode)
+      );
+      renderAll();
+    });
+  });
+}
+
+function renderSummary(items, statusItems){
+  const total = items.length;
+  const byStatus = countBy(statusItems, i => i.status || '(未設定)');
+  const totalCard = `<div class="stat"><div class="num">${total}</div><div class="label">総件数</div></div>`;
+  const container = document.getElementById('summaryCards');
+
+  if(summaryViewMode === 'status'){
+    syncGroupOrder();
+    const sorted = Object.entries(byStatus).sort(([a],[b]) => statusDisplayComparator(byStatus)(a, b));
+    const statusCardsAll = sorted.map(([status, num]) => {
+      const isActive = activeStatuses.has(status);
+      return `<div class="stat stat-toggle${isActive ? ' active' : ''}" data-status="${escapeHtml(status)}">
+        <div class="num">${num}</div><div class="label">${escapeHtml(status)}</div>
+      </div>`;
+    }).join('');
+    container.innerHTML = totalCard + statusCardsAll;
+    container.querySelectorAll('.stat-toggle[data-status]').forEach(el => {
+      el.addEventListener('click', () => toggleSetFilter(activeStatuses, el.dataset.status));
+    });
+    return;
+  }
+
+  const groupTotals = {}; // groupName -> { count, statuses: [] }
+  const ungrouped = [];
+  Object.entries(byStatus).forEach(([status, num]) => {
+    const g = settings.statusGroupMap[status];
+    if(g){
+      if(!groupTotals[g]) groupTotals[g] = { count: 0, statuses: [] };
+      groupTotals[g].count += num;
+      groupTotals[g].statuses.push(status);
+    }else{
+      ungrouped.push([status, num]);
+    }
+  });
+
+  syncGroupOrder();
+  const orderedGroupNames = settings.groupOrder.filter(g => groupTotals[g]);
+  const groupCards = orderedGroupNames.map(g => {
+    const info = groupTotals[g];
+    const activeCount = info.statuses.filter(s => activeStatuses.has(s)).length;
+    const isActive = info.statuses.length > 0 && activeCount === info.statuses.length;
+    const isPartial = !isActive && activeCount > 0;
+    const stateClass = isActive ? ' active' : (isPartial ? ' partial' : '');
+    const partialNote = isPartial ? `<div class="partial-note">${activeCount}/${info.statuses.length}件選択中</div>` : '';
+    return `<div class="stat stat-toggle${stateClass}" data-group="${escapeHtml(g)}">
+      <div class="num">${info.count}</div><div class="label">${escapeHtml(g)}</div>${partialNote}
+    </div>`;
+  }).join('');
+
+  const statusCards = ungrouped.map(([status, num]) => {
+    const isActive = activeStatuses.has(status);
+    return `<div class="stat stat-toggle${isActive ? ' active' : ''}" data-status="${escapeHtml(status)}">
+      <div class="num">${num}</div><div class="label">${escapeHtml(status)}</div>
+    </div>`;
+  }).join('');
+
+  container.innerHTML = totalCard + groupCards + statusCards;
+
+  container.querySelectorAll('.stat-toggle[data-status]').forEach(el => {
+    el.addEventListener('click', () => toggleSetFilter(activeStatuses, el.dataset.status));
+  });
+  container.querySelectorAll('.stat-toggle[data-group]').forEach(el => {
+    el.addEventListener('click', () => {
+      const g = el.dataset.group;
+      const memberStatuses = Object.keys(settings.statusGroupMap).filter(s => settings.statusGroupMap[s] === g);
+      const allActive = memberStatuses.every(s => activeStatuses.has(s));
+      memberStatuses.forEach(s => { if(allActive) activeStatuses.delete(s); else activeStatuses.add(s); });
+      renderAll();
+    });
+  });
+}
+
+function countBy(items, keyFn){
+  const map = {};
+  items.forEach(i => {
+    const k = keyFn(i);
+    map[k] = (map[k] || 0) + 1;
+  });
+  return map;
+}
+
+function toggleSetFilter(set, value){
+  if(set.has(value)) set.delete(value); else set.add(value);
+  renderAll();
+}
+
+/* ---------- マトリクスビュー（チャネル別／担当者別） ---------- */
+function renderMatrix(containerId, groupField, groupLabel, items, sortMode){
+  const container = document.getElementById(containerId);
+
+  const statusTotals = countBy(items, i => i.status || '(未設定)');
+  syncGroupOrder();
+  const statuses = Object.keys(statusTotals).sort(statusDisplayComparator(statusTotals));
+
+  const groups = [...new Set(items.map(i => i[groupField] || '(未設定)'))];
+  const matrix = {};
+  groups.forEach(g => matrix[g] = {});
+  items.forEach(i => {
+    const g = i[groupField] || '(未設定)';
+    const s = i.status || '(未設定)';
+    matrix[g][s] = (matrix[g][s] || 0) + 1;
+  });
+
+  const groupTotals = groups.map(g => [g, Object.values(matrix[g]).reduce((a,b) => a+b, 0)]);
+  if(sortMode === 'name'){
+    groupTotals.sort((a,b) => a[0].localeCompare(b[0], 'ja'));
+  }else{
+    groupTotals.sort((a,b) => b[1]-a[1]);
+  }
+
+  let html = '<div class="table-wrap"><table class="matrix-table"><thead><tr>';
+  html += `<th>${escapeHtml(groupLabel)}</th>`;
+  statuses.forEach(s => html += `<th>${escapeHtml(s)}</th>`);
+  html += '<th>合計</th></tr></thead><tbody>';
+
+  groupTotals.forEach(([g, total]) => {
+    html += `<tr><td>${escapeHtml(g)}</td>`;
+    statuses.forEach(s => {
+      const count = matrix[g][s] || 0;
+      html += count > 0
+        ? `<td><button class="matrix-cell" data-field="${groupField}" data-value="${escapeHtml(g)}" data-status="${escapeHtml(s)}">${count}</button></td>`
+        : `<td class="matrix-zero">0</td>`;
+    });
+    html += `<td><strong>${total}</strong></td></tr>`;
+  });
+  html += groupTotals.length ? '' : `<tr><td colspan="${statuses.length + 2}" class="empty">該当データがありません</td></tr>`;
+  html += '</tbody></table></div>';
+  container.innerHTML = html;
+
+  container.querySelectorAll('.matrix-cell').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const field = btn.dataset.field; // 'owner' or 'channel'
+      const value = btn.dataset.value;
+      const status = btn.dataset.status;
+      if(field === 'owner'){
+        activeRoleTags = new Set([`owner:${value}`]);
+      }else if(field === 'channel'){
+        document.getElementById('channelFilter').value = value;
+      }
+      activeStatuses = new Set([status]);
+      renderAll();
+      showView('viewList');
+    });
+  });
+}
+
+/* ---------- 担当者ボード ---------- */
+function setupOwnerBoardControls(){
+  const owners = [...new Set(rawItems.map(i => getOwnerName(i)))];
+  const counted = owners.map(o => {
+    const items = rawItems.filter(i => getOwnerName(i) === o);
+    const active = items.filter(i => !RESOLVED_STATUSES.includes(i.status || '')).length;
+    return { owner: o, active, total: items.length };
+  }).sort((a,b) => b.active - a.active || a.owner.localeCompare(b.owner, 'ja'));
+
+  const sel = document.getElementById('ownerSelect');
+  sel.innerHTML = '<option value="">担当者を選択してください</option>' +
+    counted.map(c => `<option value="${escapeHtml(c.owner)}">${escapeHtml(c.owner)}（未完了${c.active}／全${c.total}）</option>`).join('');
+  sel.addEventListener('change', () => {
+    selectedOwner = sel.value || null;
+    renderOwnerBoard();
+  });
+
+  syncGroupOrder();
+  const statusCounts = countBy(rawItems, i => i.status || '(未設定)');
+  const activeStatusList = [...new Set(
+    rawItems.map(i => i.status || '(未設定)').filter(s => !RESOLVED_STATUSES.includes(s))
+  )].sort(statusDisplayComparator(statusCounts));
+  const toggle = document.getElementById('statusToggle');
+  toggle.innerHTML = activeStatusList.map(s => `
+    <button type="button" class="status-chip" data-status="${escapeHtml(s)}">
+      <span class="dot" style="background:${colorForStatus(s)}"></span>${escapeHtml(s)}
+    </button>
+  `).join('');
+  toggle.querySelectorAll('.status-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      const s = chip.dataset.status;
+      if(hiddenStatuses.has(s)) hiddenStatuses.delete(s); else hiddenStatuses.add(s);
+      chip.classList.toggle('hidden', hiddenStatuses.has(s));
+      renderOwnerBoard();
+    });
+  });
+}
+
+function renderOwnerBoard(){
+  const detail = document.getElementById('ownerBoardDetail');
+
+  if(!selectedOwner){
+    detail.innerHTML = '<div class="empty">上のプルダウンから担当者を選択してください</div>';
+    return;
+  }
+
+  const items = rawItems.filter(i => getOwnerName(i) === selectedOwner);
+  const activeItems = items.filter(i => !RESOLVED_STATUSES.includes(i.status || ''));
+  const doneItems = items.filter(i => RESOLVED_STATUSES.includes(i.status || ''));
+  syncGroupOrder();
+
+  const statusGroups = {};
+  activeItems.forEach(i => {
+    const s = i.status || '(未設定)';
+    (statusGroups[s] = statusGroups[s] || []).push(i);
+  });
+  const statusOrder = Object.keys(statusGroups)
+    .filter(s => !hiddenStatuses.has(s))
+    .sort(statusDisplayComparator(Object.fromEntries(Object.entries(statusGroups).map(([s, arr]) => [s, arr.length]))));
+
+  let html = `<h3 class="board-owner-title">${escapeHtml(selectedOwner)} のタスク状況</h3>`;
+
+  if(statusOrder.length === 0){
+    html += '<div class="empty">表示対象の未完了タスクはありません（ステータス表示設定をご確認ください）</div>';
+  }
+  statusOrder.forEach(s => {
+    const list = [...statusGroups[s]].sort(sortByDeadline);
+    html += `<p class="board-section-title"><span class="badge" style="background:${colorForStatus(s)}">${escapeHtml(s)}</span>${list.length}件</p>`;
+    html += `<div class="board-cards">${list.map(renderTaskCard).join('')}</div>`;
+  });
+
+  html += `<details class="done-details"><summary>完了（${doneItems.length}件）</summary>`;
+  html += doneItems.length
+    ? `<div class="board-cards">${[...doneItems].sort(sortByDeadline).map(renderTaskCard).join('')}</div>`
+    : '<div class="empty">完了タスクはありません</div>';
+  html += '</details>';
+
+  detail.innerHTML = html;
+}
+
+function sortByDeadline(a, b){
+  const da = a.targetDate ? new Date(a.targetDate) : null;
+  const db = b.targetDate ? new Date(b.targetDate) : null;
+  if(da && db) return da - db;
+  if(da) return -1;
+  if(db) return 1;
+  return new Date(b.date || 0) - new Date(a.date || 0);
+}
+
+function renderTaskCard(i){
+  const link = i.url
+    ? `<a href="${escapeHtml(i.url)}" target="_blank" rel="noopener">${escapeHtml(i.title || '')}</a>`
+    : escapeHtml(i.title || '');
+  return `
+    <div class="task-card">
+      <div class="task-card-title">${link}</div>
+      <div class="task-card-meta">
+        <span>${escapeHtml(i.channel || '')}</span>
+        ${i.targetDate ? `<span class="deadline">期限: ${formatDate(i.targetDate)}</span>` : ''}
+        <span>投稿: ${formatDate(i.date)}</span>
+      </div>
+    </div>`;
+}
+
+/* ---------- 設定タブ ---------- */
+function renderSettingsTab(){
+  renderStatusGroupSettings();
+  renderHiddenPeopleSettings();
+  renderDefaultStatusSetting();
+}
+
+function renderGroupManagement(){
+  syncGroupOrder();
+  const container = document.getElementById('groupManagement');
+  const order = settings.groupOrder;
+
+  if(!order.length){
+    container.innerHTML = '';
+    return;
+  }
+
+  container.innerHTML = order.map((g, idx) => `
+    <div class="group-manage-row">
+      <span>${escapeHtml(g)}</span>
+      <span class="group-manage-actions">
+        <button type="button" class="move-btn" data-group="${escapeHtml(g)}" data-dir="-1"${idx === 0 ? ' disabled' : ''}>▲</button>
+        <button type="button" class="move-btn" data-group="${escapeHtml(g)}" data-dir="1"${idx === order.length - 1 ? ' disabled' : ''}>▼</button>
+        <button type="button" class="rename-btn" data-group="${escapeHtml(g)}">✏️ 名称変更</button>
+      </span>
+    </div>
+  `).join('');
+
+  container.querySelectorAll('.rename-btn').forEach(btn => {
+    btn.addEventListener('click', () => renameGroup(btn.dataset.group));
+  });
+  container.querySelectorAll('.move-btn').forEach(btn => {
+    btn.addEventListener('click', () => moveGroup(btn.dataset.group, parseInt(btn.dataset.dir, 10)));
+  });
+}
+
+function moveGroup(name, direction){
+  syncGroupOrder();
+  const order = settings.groupOrder;
+  const idx = order.indexOf(name);
+  const newIdx = idx + direction;
+  if(idx < 0 || newIdx < 0 || newIdx >= order.length) return;
+  [order[idx], order[newIdx]] = [order[newIdx], order[idx]];
+  onSettingsChanged();
+}
+
+function renameGroup(oldName){
+  const input = window.prompt('新しいグループ名を入力してください', oldName);
+  if(input === null) return;
+  const newName = input.trim();
+  if(!newName || newName === oldName) return;
+  Object.keys(settings.statusGroupMap).forEach(status => {
+    if(settings.statusGroupMap[status] === oldName){
+      settings.statusGroupMap[status] = newName;
+    }
+  });
+  settings.groupOrder = (settings.groupOrder || []).map(g => g === oldName ? newName : g);
+  onSettingsChanged();
+}
+
+function renderStatusGroupSettings(){
+  renderGroupManagement();
+
+  const container = document.getElementById('statusGroupSettings');
+  const statuses = [...new Set(rawItems.map(i => i.status || '(未設定)'))].sort();
+  const groupNames = [...new Set(Object.values(settings.statusGroupMap))].sort();
+
+  container.innerHTML = statuses.map(s => {
+    const current = settings.statusGroupMap[s] || '';
+    const options = ['<option value="">(グループなし)</option>']
+      .concat(groupNames.map(g => `<option value="${escapeHtml(g)}"${g === current ? ' selected' : ''}>${escapeHtml(g)}</option>`))
+      .concat(['<option value="__new__">＋ 新しいグループ…</option>'])
+      .join('');
+    return `<div class="status-group-row">
+      <span class="dot" style="background:${colorForStatus(s)}"></span>
+      <span class="status-name">${escapeHtml(s)}</span>
+      <select data-status="${escapeHtml(s)}">${options}</select>
+    </div>`;
+  }).join('') || '<div class="empty">データがありません</div>';
+
+  container.querySelectorAll('select').forEach(sel => {
+    sel.addEventListener('change', () => {
+      const status = sel.dataset.status;
+      let value = sel.value;
+      if(value === '__new__'){
+        const name = window.prompt('新しいグループ名を入力してください');
+        if(!name){ sel.value = settings.statusGroupMap[status] || ''; return; }
+        value = name.trim();
+      }
+      if(value){
+        settings.statusGroupMap[status] = value;
+      }else{
+        delete settings.statusGroupMap[status];
+      }
+      onSettingsChanged();
+    });
+  });
+}
+
+function renderHiddenPeopleSettings(){
+  const container = document.getElementById('hiddenPeopleSettings');
+  const owners = rawItems.map(i => i.owner).filter(Boolean);
+  const authors = rawItems.map(i => i.author).filter(Boolean);
+  const members = rawItems.flatMap(i => rawMemberNames(i));
+  const people = [...new Set([...owners, ...authors, ...members])].sort();
+
+  container.innerHTML = people.map(p => {
+    const checked = settings.hiddenPeople.includes(p) ? ' checked' : '';
+    return `<label><input type="checkbox" data-person="${escapeHtml(p)}"${checked}>${escapeHtml(p)}</label>`;
+  }).join('') || '<div class="empty">データがありません</div>';
+
+  container.querySelectorAll('input[type=checkbox]').forEach(cb => {
+    cb.addEventListener('change', () => {
+      const p = cb.dataset.person;
+      if(cb.checked){
+        if(!settings.hiddenPeople.includes(p)) settings.hiddenPeople.push(p);
+      }else{
+        settings.hiddenPeople = settings.hiddenPeople.filter(n => n !== p);
+      }
+      onSettingsChanged();
+    });
+  });
+}
+
+function renderDefaultStatusSetting(){
+  syncGroupOrder();
+  const container = document.getElementById('defaultStatusSetting');
+  const statuses = [...new Set(rawItems.map(i => i.status || '(未設定)'))]
+    .sort(statusDisplayComparator(countBy(rawItems, i => i.status || '(未設定)')));
+
+  container.innerHTML = statuses.map(s => {
+    const checked = settings.defaultStatuses.includes(s) ? ' checked' : '';
+    return `<label><input type="checkbox" data-status="${escapeHtml(s)}"${checked}><span class="dot" style="background:${colorForStatus(s)}"></span>${escapeHtml(s)}</label>`;
+  }).join('') || '<div class="empty">データがありません</div>';
+}
+
+function setupDefaultStatusSetting(){
+  document.getElementById('defaultStatusSetting').addEventListener('change', e => {
+    const cb = e.target.closest('input[type=checkbox]');
+    if(!cb) return;
+    const s = cb.dataset.status;
+    if(cb.checked){
+      if(!settings.defaultStatuses.includes(s)) settings.defaultStatuses.push(s);
+    }else{
+      settings.defaultStatuses = settings.defaultStatuses.filter(v => v !== s);
+    }
+    onSettingsChanged();
+  });
+}
+
+/* ---------- 一覧テーブル（ソート可） ---------- */
+function setupSortableHeaders(){
+  document.querySelectorAll('th.sortable').forEach(th => {
+    th.addEventListener('click', () => {
+      const key = th.dataset.sort;
+      if(sortState.key === key){
+        sortState.dir = sortState.dir === 'desc' ? 'asc' : 'desc';
+      }else{
+        sortState.key = key;
+        sortState.dir = 'desc';
+      }
+      renderAll();
+    });
+  });
+}
+
+function renderTable(items){
+  const key = sortState.key;
+  const dir = sortState.dir === 'asc' ? 1 : -1;
+  const sorted = [...items].sort((a,b) => ((a[key] || '') > (b[key] || '') ? 1 : -1) * dir);
+
+  updateSortMarks();
+
+  document.getElementById('tableBody').innerHTML = sorted.map(i => `
+    <tr>
+      <td class="title">${i.url ? `<a href="${escapeHtml(i.url)}" target="_blank" rel="noopener">${escapeHtml(i.title || '')}</a>` : escapeHtml(i.title || '')}</td>
+      <td>${renderEditLink(i)}</td>
+      <td><span class="badge" style="background:${colorForStatus(i.status || '(未設定)')}">${escapeHtml(i.status || '(未設定)')}</span></td>
+      <td>${escapeHtml(getOwnerName(i))}</td>
+      <td>${escapeHtml(getMemberNames(i).join('、'))}</td>
+      <td>${escapeHtml(getAuthorName(i))}</td>
+      <td>${escapeHtml(i.channel || '')}</td>
+      <td>${formatDate(i.date)}</td>
+      <td>${formatDate(i.modified)}</td>
+    </tr>
+  `).join('') || '<tr><td colspan="9" class="empty">該当データがありません</td></tr>';
+}
+
+function renderEditLink(item){
+  const url = getEditUrl(item);
+  if(!url) return '';
+  return `<a href="${escapeHtml(url)}" target="_blank" rel="noopener" class="edit-link" title="リスト項目を編集">✏️</a>`;
+}
+
+function updateSortMarks(){
+  const arrow = sortState.dir === 'asc' ? '▲' : '▼';
+  document.getElementById('sortMarkDate').textContent = sortState.key === 'date' ? ` ${arrow}` : '';
+  document.getElementById('sortMarkModified').textContent = sortState.key === 'modified' ? ` ${arrow}` : '';
+}
+
+function formatDate(str){
+  if(!str) return '';
+  const d = new Date(str);
+  if(isNaN(d)) return str;
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}/${m}/${day}`;
+}
+
+function escapeHtml(str){
+  return String(str).replace(/[&<>"']/g, c => ({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+  }[c]));
+}
+</script>
+
+</body>
+</html>
