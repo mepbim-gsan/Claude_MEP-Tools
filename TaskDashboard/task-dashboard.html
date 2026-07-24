@@ -1,7 +1,8 @@
 <!--
   @tool      DD-MEP タスク管理ダッシュボード
-  @version   v2026-07-24
+  @version   v2026-07-24.2
   @changelog
+    v2026-07-24.2 - スマホ対応（800px以下メディアクエリ追加）、renderMatrixのowner分岐（到達不能コード）を削除
     v2026-07-24 - Claude Code管理へ移行（task-dashboard-23.html → task-dashboard.html にリネーム、バージョンヘッダー付与）
 -->
 <!DOCTYPE html>
@@ -571,6 +572,22 @@
   }
   .hidden-people-list input{
     margin:0;
+  }
+
+  /* スマートフォン対応 */
+  @media(max-width:800px){
+    body{ padding:8px; }
+    h1{ font-size:1.05rem; }
+    .tab-btn{ padding:7px 9px; font-size:0.8rem; }
+    .summary .stat{ flex:1 1 72px; padding:6px 8px; }
+    .summary .stat .num{ font-size:1.1rem; }
+    .filters select{ flex:1 1 100%; }
+    table{ font-size:0.75rem; }
+    th,td{ padding:5px 4px; }
+    .table-wrap{ max-height:60vh; }
+    .role-table{ font-size:0.72rem; }
+    .role-table th:not(:first-child), .role-table td:not(:first-child){ width:52px; }
+    .bar-row .bar-label{ flex-basis:64px; }
   }
 </style>
 </head>
@@ -1215,7 +1232,7 @@ function renderMatrix(containerId, groupField, groupLabel, items, sortMode){
     statuses.forEach(s => {
       const count = matrix[g][s] || 0;
       html += count > 0
-        ? `<td><button class="matrix-cell" data-field="${groupField}" data-value="${escapeHtml(g)}" data-status="${escapeHtml(s)}">${count}</button></td>`
+        ? `<td><button class="matrix-cell" data-value="${escapeHtml(g)}" data-status="${escapeHtml(s)}">${count}</button></td>`
         : `<td class="matrix-zero">0</td>`;
     });
     html += `<td><strong>${total}</strong></td></tr>`;
@@ -1226,14 +1243,9 @@ function renderMatrix(containerId, groupField, groupLabel, items, sortMode){
 
   container.querySelectorAll('.matrix-cell').forEach(btn => {
     btn.addEventListener('click', () => {
-      const field = btn.dataset.field; // 'owner' or 'channel'
       const value = btn.dataset.value;
       const status = btn.dataset.status;
-      if(field === 'owner'){
-        activeRoleTags = new Set([`owner:${value}`]);
-      }else if(field === 'channel'){
-        document.getElementById('channelFilter').value = value;
-      }
+      document.getElementById('channelFilter').value = value;
       activeStatuses = new Set([status]);
       renderAll();
       showView('viewList');
