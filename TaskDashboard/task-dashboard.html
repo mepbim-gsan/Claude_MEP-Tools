@@ -1,7 +1,8 @@
 <!--
   @tool      DD-MEP タスク管理ダッシュボード
-  @version   v2026-07-24.2
+  @version   v2026-07-24.3
   @changelog
+    v2026-07-24.3 - JSON読み込み欄をヘッダー右上にコンパクト化（タイトルと同一行に統合）
     v2026-07-24.2 - スマホ対応（800px以下メディアクエリ追加）、renderMatrixのowner分岐（到達不能コード）を削除
     v2026-07-24 - Claude Code管理へ移行（task-dashboard-23.html → task-dashboard.html にリネーム、バージョンヘッダー付与）
 -->
@@ -39,17 +40,41 @@
     padding:14px;
     margin-bottom:12px;
   }
-  .loader{
+  .header-bar{
     display:flex;
-    flex-direction:column;
-    gap:8px;
+    align-items:center;
+    justify-content:space-between;
+    flex-wrap:wrap;
+    gap:6px 12px;
+    margin-bottom:12px;
   }
-  .loader input[type=file]{
-    font-size:0.9rem;
+  .header-bar h1{
+    margin:0;
   }
-  .loader .hint{
+  .loader-compact{
+    display:flex;
+    align-items:center;
+    gap:6px;
     font-size:0.78rem;
     color:var(--sub);
+    cursor:help;
+  }
+  .loader-compact label{
+    font-weight:600;
+    white-space:nowrap;
+  }
+  .loader-compact input[type=file]{
+    font-size:0.78rem;
+    max-width:200px;
+  }
+  .loader-compact input[type=file]::file-selector-button{
+    font-size:0.75rem;
+    padding:4px 8px;
+    border-radius:6px;
+    border:1px solid var(--border);
+    background:#fff;
+    cursor:pointer;
+    margin-right:6px;
   }
 
   /* タブ */
@@ -578,6 +603,8 @@
   @media(max-width:800px){
     body{ padding:8px; }
     h1{ font-size:1.05rem; }
+    .loader-compact{ font-size:0.72rem; }
+    .loader-compact input[type=file]{ max-width:140px; }
     .tab-btn{ padding:7px 9px; font-size:0.8rem; }
     .summary .stat{ flex:1 1 72px; padding:6px 8px; }
     .summary .stat .num{ font-size:1.1rem; }
@@ -593,12 +620,12 @@
 </head>
 <body>
 
-<h1>DD-MEP タスク管理ダッシュボード</h1>
-
-<div class="card loader">
-  <label for="fileInput"><strong>JSONファイルを読み込み</strong>（複数リストを同時選択すると統合表示できます）</label>
-  <input type="file" id="fileInput" accept=".json" multiple>
-  <div class="hint">本番運用時は SharePoint ドキュメントライブラリから自動取得する方式に切り替え予定です。</div>
+<div class="header-bar">
+  <h1>DD-MEP タスク管理ダッシュボード</h1>
+  <div class="loader-compact" title="複数リストを同時選択すると統合表示できます。本番運用時はSharePointドキュメントライブラリから自動取得する方式に切り替え予定です。">
+    <label for="fileInput">JSON読み込み</label>
+    <input type="file" id="fileInput" accept=".json" multiple>
+  </div>
 </div>
 
 <div id="dashboard" style="display:none;">
