@@ -1,10 +1,10 @@
 <!--
   @tool      DD-MEP タスク管理ダッシュボード
-  @version   v2026-07-24.5
+  @version   v2026-07-24.6
   @changelog
+    v2026-07-24.6 - バックログ2件を実装：タイトル検索＋日付範囲フィルタ（投稿日/更新日/期限）、ステータスのカラー設定（settings.statusColorMap）
     v2026-07-24.5 - 役割パネルのスクロール枠をモバイルでさらに縮小（360px→200px）、人数が多い場合にタスク一覧が下に押しやられる問題を緩和
     v2026-07-24.4 - JSON読み込みをアイコンボタン化、選択ファイル名をフル表示（省略なし）に変更
-    v2026-07-24.3 - JSON読み込み欄をヘッダー右上にコンパクト化（タイトルと同一行に統合）
 -->
 <!DOCTYPE html>
 <html lang="ja">
@@ -287,7 +287,7 @@
     flex-wrap:wrap;
     margin-bottom:10px;
   }
-  .filters select{
+  .filters select, .filters input[type=text], .filters input[type=date]{
     flex:1 1 120px;
     padding:6px 8px;
     border:1px solid var(--border);
@@ -305,6 +305,33 @@
     color:var(--sub);
     cursor:pointer;
   }
+  .date-filter{
+    align-items:center;
+  }
+  .date-filter select{
+    flex:0 1 110px;
+  }
+  .date-filter input[type=date]{
+    flex:1 1 130px;
+  }
+  .date-filter-sep{
+    color:var(--sub);
+    font-size:0.8rem;
+  }
+  .status-color-input{
+    -webkit-appearance:none;
+    appearance:none;
+    width:20px;
+    height:20px;
+    flex:0 0 auto;
+    border:1px solid var(--border);
+    border-radius:5px;
+    padding:0;
+    cursor:pointer;
+    background:none;
+  }
+  .status-color-input::-webkit-color-swatch-wrapper{ padding:0; }
+  .status-color-input::-webkit-color-swatch{ border:none; border-radius:4px; }
 
   table{
     width:100%;
@@ -604,7 +631,8 @@
     .tab-btn{ padding:7px 9px; font-size:0.8rem; }
     .summary .stat{ flex:1 1 72px; padding:6px 8px; }
     .summary .stat .num{ font-size:1.1rem; }
-    .filters select{ flex:1 1 100%; }
+    .filters select, .filters input[type=text], .filters input[type=date]{ flex:1 1 100%; }
+    .date-filter select{ flex:1 1 100%; }
     table{ font-size:0.75rem; }
     th,td{ padding:5px 4px; }
     .table-wrap{ max-height:60vh; }
@@ -658,9 +686,20 @@
 
     <div class="card">
       <div class="filters">
+        <input type="text" id="textFilter" placeholder="タイトルで検索">
         <select id="channelFilter"><option value="">チャネル：すべて</option></select>
         <select id="listSourceFilter"><option value="">リスト：すべて</option></select>
         <button class="reset-btn" id="resetFilters">条件クリア</button>
+      </div>
+      <div class="filters date-filter">
+        <select id="dateFilterField">
+          <option value="date">投稿日</option>
+          <option value="modified">更新日</option>
+          <option value="targetDate">期限</option>
+        </select>
+        <input type="date" id="dateFilterFrom">
+        <span class="date-filter-sep">〜</span>
+        <input type="date" id="dateFilterTo">
       </div>
       <p class="view-hint">ステータスは上のサマリーカードをクリックして絞り込みます（複数選択可）。</p>
       <div class="table-wrap">
@@ -752,8 +791,8 @@ let hiddenStatuses = new Set();
 // 設定：Setting.json（基本）＋ localStorage（個人上書き）の二層構成
 // statusGroupMap: { "ステータス名": "グループ名" }
 // hiddenPeople: ["表示しない人の名前", ...]
-let settings = { statusGroupMap: {}, hiddenPeople: [], groupOrder: [], defaultStatuses: [] };
-let baseSettingsFromFile = { statusGroupMap: {}, hiddenPeople: [], groupOrder: [], defaultStatuses: [] };
+let settings = { statusGroupMap: {}, hiddenPeople: [], groupOrder: [], defaultStatuses: [], statusColorMap: {} };
+let baseSettingsFromFile = { statusGroupMap: {}, hiddenPeople: [], groupOrder: [], defaultStatuses: [], statusColorMap: {} };
 const SETTINGS_LS_KEY = 'ddmepDashboardSettingsOverride';
 
 // ここに含まれるステータスは「完了扱い」として担当者ボードで折りたたみ表示します
@@ -804,13 +843,14 @@ function getMemberNames(item){
   return rawMemberNames(item).filter(n => !isHiddenPerson(n) && n !== item.owner);
 }
 
-const statusColorMap = {};
+const autoColorCache = {};
 function colorForStatus(status){
-  if(!statusColorMap[status]){
-    const idx = Object.keys(statusColorMap).length % COLOR_PALETTE.length;
-    statusColorMap[status] = COLOR_PALETTE[idx];
+  if(settings.statusColorMap && settings.statusColorMap[status]) return settings.statusColorMap[status];
+  if(!autoColorCache[status]){
+    const idx = Object.keys(autoColorCache).length % COLOR_PALETTE.length;
+    autoColorCache[status] = COLOR_PALETTE[idx];
   }
-  return statusColorMap[status];
+  return autoColorCache[status];
 }
 
 document.getElementById('fileInput').addEventListener('change', function(e){
@@ -888,7 +928,8 @@ function normalizeSettings(obj){
     statusGroupMap: (obj && typeof obj.statusGroupMap === 'object' && obj.statusGroupMap) || {},
     hiddenPeople: (obj && Array.isArray(obj.hiddenPeople)) ? obj.hiddenPeople : [],
     groupOrder: (obj && Array.isArray(obj.groupOrder)) ? obj.groupOrder : [],
-    defaultStatuses: (obj && Array.isArray(obj.defaultStatuses)) ? obj.defaultStatuses : []
+    defaultStatuses: (obj && Array.isArray(obj.defaultStatuses)) ? obj.defaultStatuses : [],
+    statusColorMap: (obj && typeof obj.statusColorMap === 'object' && obj.statusColorMap) || {}
   };
 }
 
@@ -973,6 +1014,10 @@ function init(){
   selectedOwner = null;
   hiddenStatuses = new Set();
   summaryViewMode = 'group';
+  document.getElementById('textFilter').value = '';
+  document.getElementById('dateFilterField').value = 'date';
+  document.getElementById('dateFilterFrom').value = '';
+  document.getElementById('dateFilterTo').value = '';
   buildFilters();
   setupTabs();
   setupSortableHeaders();
@@ -982,6 +1027,10 @@ function init(){
   renderSettingsTab();
   document.getElementById('resetFilters').addEventListener('click', () => {
     ['channelFilter','listSourceFilter'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('textFilter').value = '';
+    document.getElementById('dateFilterField').value = 'date';
+    document.getElementById('dateFilterFrom').value = '';
+    document.getElementById('dateFilterTo').value = '';
     activeStatuses = new Set();
     activeRoleTags = new Set();
     renderAll();
@@ -1011,6 +1060,10 @@ function buildFilters(){
   ['channelFilter','listSourceFilter'].forEach(id =>
     document.getElementById(id).addEventListener('change', renderAll)
   );
+  document.getElementById('textFilter').addEventListener('input', renderAll);
+  ['dateFilterField','dateFilterFrom','dateFilterTo'].forEach(id =>
+    document.getElementById(id).addEventListener('change', renderAll)
+  );
 }
 function fillSelect(id, allLabel, values){
   const sel = document.getElementById(id);
@@ -1022,12 +1075,24 @@ function getFiltered(options){
   const exclude = (options && options.exclude) || [];
   const channel = document.getElementById('channelFilter').value;
   const listSource = document.getElementById('listSourceFilter').value;
+  const text = document.getElementById('textFilter').value.trim().toLowerCase();
+  const dateField = document.getElementById('dateFilterField').value;
+  const dateFrom = document.getElementById('dateFilterFrom').value;
+  const dateTo = document.getElementById('dateFilterTo').value;
   return rawItems.filter(i => {
     const status = i.status || '(未設定)';
     const owner = getOwnerName(i);
     if(!exclude.includes('status') && activeStatuses.size && !activeStatuses.has(status)) return false;
     if(!exclude.includes('channel') && channel && (i.channel || '(未設定)') !== channel) return false;
     if(!exclude.includes('listSource') && listSource && (i._sourceList || '(未設定)') !== listSource) return false;
+    if(text && !(i.title || '').toLowerCase().includes(text)) return false;
+    if(dateFrom || dateTo){
+      const raw = i[dateField];
+      if(!raw) return false;
+      const d = String(raw).slice(0, 10);
+      if(dateFrom && d < dateFrom) return false;
+      if(dateTo && d > dateTo) return false;
+    }
     if(!exclude.includes('roleTags') && activeRoleTags.size){
       const matches = [...activeRoleTags].some(tag => {
         const sep = tag.indexOf(':');
@@ -1460,11 +1525,18 @@ function renderStatusGroupSettings(){
       .concat(['<option value="__new__">＋ 新しいグループ…</option>'])
       .join('');
     return `<div class="status-group-row">
-      <span class="dot" style="background:${colorForStatus(s)}"></span>
+      <input type="color" class="status-color-input" data-status="${escapeHtml(s)}" value="${colorForStatus(s)}" title="${escapeHtml(s)}の色を変更">
       <span class="status-name">${escapeHtml(s)}</span>
       <select data-status="${escapeHtml(s)}">${options}</select>
     </div>`;
   }).join('') || '<div class="empty">データがありません</div>';
+
+  container.querySelectorAll('.status-color-input').forEach(inp => {
+    inp.addEventListener('change', () => {
+      settings.statusColorMap[inp.dataset.status] = inp.value;
+      onSettingsChanged();
+    });
+  });
 
   container.querySelectorAll('select').forEach(sel => {
     sel.addEventListener('change', () => {
