@@ -1,10 +1,10 @@
 <!--
   @tool      DD-MEP タスク管理ダッシュボード
-  @version   v2026-07-24.4
+  @version   v2026-07-24.5
   @changelog
+    v2026-07-24.5 - 役割パネルのスクロール枠をモバイルでさらに縮小（360px→200px）、人数が多い場合にタスク一覧が下に押しやられる問題を緩和
     v2026-07-24.4 - JSON読み込みをアイコンボタン化、選択ファイル名をフル表示（省略なし）に変更
     v2026-07-24.3 - JSON読み込み欄をヘッダー右上にコンパクト化（タイトルと同一行に統合）
-    v2026-07-24.2 - スマホ対応（800px以下メディアクエリ追加）、renderMatrixのowner分岐（到達不能コード）を削除
 -->
 <!DOCTYPE html>
 <html lang="ja">
@@ -349,6 +349,9 @@
     max-height:440px;
     overflow:auto;
   }
+  .table-wrap.role-panel-wrap{
+    max-height:360px;
+  }
   .empty{
     color:var(--sub);
     font-size:0.85rem;
@@ -605,6 +608,7 @@
     table{ font-size:0.75rem; }
     th,td{ padding:5px 4px; }
     .table-wrap{ max-height:60vh; }
+    .table-wrap.role-panel-wrap{ max-height:200px; }
     .role-table{ font-size:0.72rem; }
     .role-table th:not(:first-child), .role-table td:not(:first-child){ width:52px; }
     .bar-row .bar-label{ flex-basis:64px; }
@@ -642,7 +646,7 @@
 
     <div class="card">
       <p class="view-hint">名前をタップすると担当者・関係者・投稿者をまとめて絞り込みます。各件数バッジは個別にON/OFFできます。</p>
-      <div class="table-wrap" style="max-height:360px;">
+      <div class="table-wrap role-panel-wrap">
         <table class="role-table">
           <thead>
             <tr><th>氏名</th><th>担当</th><th>関係</th><th>投稿</th></tr>
