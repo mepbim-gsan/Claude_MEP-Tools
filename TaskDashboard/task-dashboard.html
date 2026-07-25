@@ -1,10 +1,10 @@
 <!--
   @tool      DD-MEP タスク管理ダッシュボード
-  @version   v2026-07-24.6
+  @version   v2026-07-24.7
   @changelog
+    v2026-07-24.7 - 担当者別タブのタスクカードにも編集リンク（鉛筆アイコン）を追加
     v2026-07-24.6 - バックログ2件を実装：タイトル検索＋日付範囲フィルタ（投稿日/更新日/期限）、ステータスのカラー設定（settings.statusColorMap）
     v2026-07-24.5 - 役割パネルのスクロール枠をモバイルでさらに縮小（360px→200px）、人数が多い場合にタスク一覧が下に押しやられる問題を緩和
-    v2026-07-24.4 - JSON読み込みをアイコンボタン化、選択ファイル名をフル表示（省略なし）に変更
 -->
 <!DOCTYPE html>
 <html lang="ja">
@@ -362,6 +362,7 @@
     text-decoration:none;
     font-size:0.9rem;
     opacity:0.7;
+    margin-left:4px;
   }
   .edit-link:hover{ opacity:1; }
   .badge{
@@ -1442,7 +1443,7 @@ function renderTaskCard(i){
     : escapeHtml(i.title || '');
   return `
     <div class="task-card">
-      <div class="task-card-title">${link}</div>
+      <div class="task-card-title">${link}${renderEditLink(i)}</div>
       <div class="task-card-meta">
         <span>${escapeHtml(i.channel || '')}</span>
         ${i.targetDate ? `<span class="deadline">期限: ${formatDate(i.targetDate)}</span>` : ''}
