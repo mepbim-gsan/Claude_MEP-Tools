@@ -1,10 +1,10 @@
 <!--
   @tool      DD-MEP タスク管理ダッシュボード
-  @version   v2026-07-24.12
+  @version   v2026-07-24.13
   @changelog
+    v2026-07-24.13 - 担当者別タブのステータス選択チップが一覧のフィルタを反映していなかった不具合を修正（renderAll()のたびに再構築）
     v2026-07-24.12 - 一覧タブで1人だけに絞り込んでいる場合、担当者別タブを開くとその人を自動選択するように変更
     v2026-07-24.11 - 担当者別タブにも一覧のフィルタ（チャネル/ステータス/テキスト/期間）を適用、条件クリアをタブ横に常設して全タブから操作可能に
-    v2026-07-24.10 - 担当者別からチャネルクリックで一覧遷移する際、担当者・ステータスも一緒に引き継ぐよう修正（表示内容のブレを解消）
 -->
 <!DOCTYPE html>
 <html lang="ja">
@@ -1217,6 +1217,7 @@ function renderAll(){
   renderTable(items);
   renderRolePanel();
   renderMatrix('groupMatrix', 'channel', 'チャネル', getFiltered({exclude:['channel']}), 'name');
+  renderOwnerStatusToggle();
   renderOwnerBoard();
   updateFilterStatus();
 }
@@ -1476,15 +1477,20 @@ function setupOwnerBoardControls(){
     selectedOwner = sel.value || null;
     renderOwnerBoard();
   });
+}
 
+// ステータス表示ON/OFFチップ：一覧タブのフィルタ（チャネル/ステータス/テキスト/期間）を反映して
+// 対象外になったステータスのチップは出さないよう、renderAll()のたびに再構築する
+function renderOwnerStatusToggle(){
   syncGroupOrder();
-  const statusCounts = countBy(rawItems, i => i.status || '(未設定)');
+  const filteredItems = getFiltered({exclude:['roleTags']});
+  const statusCounts = countBy(filteredItems, i => i.status || '(未設定)');
   const activeStatusList = [...new Set(
-    rawItems.map(i => i.status || '(未設定)').filter(s => !RESOLVED_STATUSES.includes(s))
+    filteredItems.map(i => i.status || '(未設定)').filter(s => !RESOLVED_STATUSES.includes(s))
   )].sort(statusDisplayComparator(statusCounts));
   const toggle = document.getElementById('statusToggle');
   toggle.innerHTML = activeStatusList.map(s => `
-    <button type="button" class="status-chip" data-status="${escapeHtml(s)}">
+    <button type="button" class="status-chip${hiddenStatuses.has(s) ? ' hidden' : ''}" data-status="${escapeHtml(s)}">
       <span class="dot" style="background:${colorForStatus(s)}"></span>${escapeHtml(s)}
     </button>
   `).join('');
@@ -1492,8 +1498,8 @@ function setupOwnerBoardControls(){
     chip.addEventListener('click', () => {
       const s = chip.dataset.status;
       if(hiddenStatuses.has(s)) hiddenStatuses.delete(s); else hiddenStatuses.add(s);
-      chip.classList.toggle('hidden', hiddenStatuses.has(s));
       renderOwnerBoard();
+      renderOwnerStatusToggle();
     });
   });
 }
