@@ -1,11 +1,10 @@
 <!--
   @tool      DD-MEP タスク管理ダッシュボード
-  @version   v2026-07-24.9
+  @version   v2026-07-24.10
   @changelog
+    v2026-07-24.10 - 担当者別からチャネルクリックで一覧遷移する際、担当者・ステータスも一緒に引き継ぐよう修正（表示内容のブレを解消）
     v2026-07-24.9 - チャネル名クリックで絞り込み（一覧・担当者別）、ヘッダー+タブをスクロール時も固定表示
     v2026-07-24.8 - タスクカードの鉛筆アイコンをタイトル前に移動、チャネル/期限/投稿日をグリッドで列揃え
-    v2026-07-24.7 - 担当者別タブのタスクカードにも編集リンク（鉛筆アイコン）を追加
-    v2026-07-24.5 - 役割パネルのスクロール枠をモバイルでさらに縮小（360px→200px）、人数が多い場合にタスク一覧が下に押しやられる問題を緩和
 -->
 <!DOCTYPE html>
 <html lang="ja">
@@ -957,6 +956,9 @@ document.getElementById('ownerBoardDetail').addEventListener('click', e => {
   const el = e.target.closest('.channel-link');
   if(!el) return;
   document.getElementById('channelFilter').value = el.dataset.channel;
+  // 担当者別からの遷移時は、見ていた担当者とそのタスクのステータスも一覧側に引き継ぎ、表示内容がブレないようにする
+  activeRoleTags = selectedOwner ? new Set([`owner:${selectedOwner}`]) : new Set();
+  activeStatuses = el.dataset.status ? new Set([el.dataset.status]) : new Set();
   renderAll();
   showView('viewList');
 });
@@ -1495,7 +1497,7 @@ function renderTaskCard(i){
     <div class="task-card">
       <div class="task-card-title">${renderEditLink(i)}${link}</div>
       <div class="task-card-meta">
-        <span class="meta-channel${i.channel ? ' channel-link' : ''}"${i.channel ? ` data-channel="${escapeHtml(i.channel)}"` : ''}>${escapeHtml(i.channel || '')}</span>
+        <span class="meta-channel${i.channel ? ' channel-link' : ''}"${i.channel ? ` data-channel="${escapeHtml(i.channel)}" data-status="${escapeHtml(i.status || '(未設定)')}"` : ''}>${escapeHtml(i.channel || '')}</span>
         <span class="meta-deadline${i.targetDate ? ' deadline' : ''}">${i.targetDate ? `期限: ${formatDate(i.targetDate)}` : ''}</span>
         <span class="meta-date">投稿: ${formatDate(i.date)}</span>
       </div>
