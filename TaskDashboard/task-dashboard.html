@@ -1,10 +1,10 @@
 <!--
   @tool      DD-MEP タスク管理ダッシュボード
-  @version   v2026-07-24.8
+  @version   v2026-07-24.9
   @changelog
+    v2026-07-24.9 - チャネル名クリックで絞り込み（一覧・担当者別）、ヘッダー+タブをスクロール時も固定表示
     v2026-07-24.8 - タスクカードの鉛筆アイコンをタイトル前に移動、チャネル/期限/投稿日をグリッドで列揃え
     v2026-07-24.7 - 担当者別タブのタスクカードにも編集リンク（鉛筆アイコン）を追加
-    v2026-07-24.6 - バックログ2件を実装：タイトル検索＋日付範囲フィルタ（投稿日/更新日/期限）、ステータスのカラー設定（settings.statusColorMap）
     v2026-07-24.5 - 役割パネルのスクロール枠をモバイルでさらに縮小（360px→200px）、人数が多い場合にタスク一覧が下に押しやられる問題を緩和
 -->
 <!DOCTYPE html>
@@ -21,6 +21,7 @@
     --text:#1c2128;
     --sub:#6b7280;
     --accent:#2563eb;
+    --page-pad:12px;
   }
   *{box-sizing:border-box;}
   body{
@@ -28,7 +29,7 @@
     font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Hiragino Sans","Yu Gothic",sans-serif;
     background:var(--bg);
     color:var(--text);
-    padding:12px;
+    padding:var(--page-pad);
   }
   h1{
     font-size:1.15rem;
@@ -40,6 +41,14 @@
     border-radius:10px;
     padding:14px;
     margin-bottom:12px;
+  }
+  .sticky-header{
+    position:sticky;
+    top:0;
+    margin:calc(var(--page-pad) * -1) calc(var(--page-pad) * -1) 0;
+    padding:var(--page-pad) var(--page-pad) 0;
+    background:var(--bg);
+    z-index:30;
   }
   .header-bar{
     display:flex;
@@ -359,6 +368,14 @@
     color:var(--accent);
     text-decoration:none;
   }
+  .channel-link{
+    cursor:pointer;
+    border-radius:4px;
+  }
+  .channel-link:hover{
+    color:var(--accent);
+    text-decoration:underline;
+  }
   .edit-link{
     text-decoration:none;
     font-size:0.9rem;
@@ -640,7 +657,7 @@
 
   /* スマートフォン対応 */
   @media(max-width:800px){
-    body{ padding:8px; }
+    :root{ --page-pad:8px; }
     h1{ font-size:1.05rem; }
     .loaded-file-name{ max-width:140px; font-size:0.72rem; }
     .tab-btn{ padding:7px 9px; font-size:0.8rem; }
@@ -661,23 +678,25 @@
 </head>
 <body>
 
-<div class="header-bar">
-  <h1>DD-MEP タスク管理ダッシュボード</h1>
-  <div class="loader-compact" title="複数リストを同時選択すると統合表示できます。本番運用時はSharePointドキュメントライブラリから自動取得する方式に切り替え予定です。">
-    <label for="fileInput" class="file-icon-btn" aria-label="JSONファイルを読み込み">📂</label>
-    <input type="file" id="fileInput" accept=".json" multiple hidden>
-    <span id="loadedFileName" class="loaded-file-name"></span>
+<div class="sticky-header">
+  <div class="header-bar">
+    <h1>DD-MEP タスク管理ダッシュボード</h1>
+    <div class="loader-compact" title="複数リストを同時選択すると統合表示できます。本番運用時はSharePointドキュメントライブラリから自動取得する方式に切り替え予定です。">
+      <label for="fileInput" class="file-icon-btn" aria-label="JSONファイルを読み込み">📂</label>
+      <input type="file" id="fileInput" accept=".json" multiple hidden>
+      <span id="loadedFileName" class="loaded-file-name"></span>
+    </div>
   </div>
-</div>
 
-<div id="dashboard" style="display:none;">
-
-  <div class="tabs">
+  <div class="tabs" id="tabsBar" style="display:none;">
     <button class="tab-btn active" data-view="viewList">一覧</button>
     <button class="tab-btn" data-view="viewGroup">チャネル別</button>
     <button class="tab-btn" data-view="viewOwner">担当者別</button>
     <button class="tab-btn" data-view="viewSettings">設定</button>
   </div>
+</div>
+
+<div id="dashboard" style="display:none;">
 
   <!-- 一覧タブ -->
   <div class="view active" id="viewList">
@@ -927,6 +946,21 @@ document.getElementById('resetLocalSettingsBtn').addEventListener('click', () =>
   }
 });
 
+// チャネル名クリックで絞り込み（一覧タブ・担当者別タブ共通、イベント委譲）
+document.getElementById('tableBody').addEventListener('click', e => {
+  const el = e.target.closest('.channel-link');
+  if(!el) return;
+  document.getElementById('channelFilter').value = el.dataset.channel;
+  renderAll();
+});
+document.getElementById('ownerBoardDetail').addEventListener('click', e => {
+  const el = e.target.closest('.channel-link');
+  if(!el) return;
+  document.getElementById('channelFilter').value = el.dataset.channel;
+  renderAll();
+  showView('viewList');
+});
+
 function readSettingsFile(file){
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -1024,6 +1058,7 @@ function readJsonFile(file){
 function init(){
   document.getElementById('emptyState').style.display = 'none';
   document.getElementById('dashboard').style.display = 'block';
+  document.getElementById('tabsBar').style.display = 'flex';
   const existingStatuses = new Set(rawItems.map(i => i.status || '(未設定)'));
   activeStatuses = new Set(settings.defaultStatuses.filter(s => existingStatuses.has(s)));
   activeRoleTags = new Set();
@@ -1460,7 +1495,7 @@ function renderTaskCard(i){
     <div class="task-card">
       <div class="task-card-title">${renderEditLink(i)}${link}</div>
       <div class="task-card-meta">
-        <span class="meta-channel">${escapeHtml(i.channel || '')}</span>
+        <span class="meta-channel${i.channel ? ' channel-link' : ''}"${i.channel ? ` data-channel="${escapeHtml(i.channel)}"` : ''}>${escapeHtml(i.channel || '')}</span>
         <span class="meta-deadline${i.targetDate ? ' deadline' : ''}">${i.targetDate ? `期限: ${formatDate(i.targetDate)}` : ''}</span>
         <span class="meta-date">投稿: ${formatDate(i.date)}</span>
       </div>
@@ -1655,7 +1690,7 @@ function renderTable(items){
       <td>${escapeHtml(getOwnerName(i))}</td>
       <td>${escapeHtml(getMemberNames(i).join('、'))}</td>
       <td>${escapeHtml(getAuthorName(i))}</td>
-      <td>${escapeHtml(i.channel || '')}</td>
+      <td>${i.channel ? `<span class="channel-link" data-channel="${escapeHtml(i.channel)}">${escapeHtml(i.channel)}</span>` : ''}</td>
       <td>${formatDate(i.date)}</td>
       <td>${formatDate(i.modified)}</td>
     </tr>
