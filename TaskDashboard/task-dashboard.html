@@ -1,10 +1,10 @@
 <!--
   @tool      DD-MEP タスク管理ダッシュボード
-  @version   v2026-07-24.10
+  @version   v2026-07-24.11
   @changelog
+    v2026-07-24.11 - 担当者別タブにも一覧のフィルタ（チャネル/ステータス/テキスト/期間）を適用、条件クリアをタブ横に常設して全タブから操作可能に
     v2026-07-24.10 - 担当者別からチャネルクリックで一覧遷移する際、担当者・ステータスも一緒に引き継ぐよう修正（表示内容のブレを解消）
     v2026-07-24.9 - チャネル名クリックで絞り込み（一覧・担当者別）、ヘッダー+タブをスクロール時も固定表示
-    v2026-07-24.8 - タスクカードの鉛筆アイコンをタイトル前に移動、チャネル/期限/投稿日をグリッドで列揃え
 -->
 <!DOCTYPE html>
 <html lang="ja">
@@ -81,12 +81,28 @@
   }
 
   /* タブ */
+  .tabs-row{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    flex-wrap:wrap;
+    gap:6px 12px;
+    margin-bottom:12px;
+    border-bottom:1px solid var(--border);
+  }
   .tabs{
     display:flex;
     flex-wrap:wrap;
     gap:6px;
-    margin-bottom:12px;
-    border-bottom:1px solid var(--border);
+  }
+  .filter-status{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    font-size:0.75rem;
+    color:var(--accent);
+    font-weight:600;
+    padding-bottom:6px;
   }
   .tab-btn{
     appearance:none;
@@ -687,11 +703,17 @@
     </div>
   </div>
 
-  <div class="tabs" id="tabsBar" style="display:none;">
-    <button class="tab-btn active" data-view="viewList">一覧</button>
-    <button class="tab-btn" data-view="viewGroup">チャネル別</button>
-    <button class="tab-btn" data-view="viewOwner">担当者別</button>
-    <button class="tab-btn" data-view="viewSettings">設定</button>
+  <div class="tabs-row" id="tabsBar" style="display:none;">
+    <div class="tabs">
+      <button class="tab-btn active" data-view="viewList">一覧</button>
+      <button class="tab-btn" data-view="viewGroup">チャネル別</button>
+      <button class="tab-btn" data-view="viewOwner">担当者別</button>
+      <button class="tab-btn" data-view="viewSettings">設定</button>
+    </div>
+    <div class="filter-status" id="filterStatus" style="display:none;">
+      <span class="filter-status-label">絞り込み中</span>
+      <button class="reset-btn" id="resetFilters">条件クリア</button>
+    </div>
   </div>
 </div>
 
@@ -723,7 +745,6 @@
         <input type="text" id="textFilter" placeholder="タイトルで検索">
         <select id="channelFilter"><option value="">チャネル：すべて</option></select>
         <select id="listSourceFilter"><option value="">リスト：すべて</option></select>
-        <button class="reset-btn" id="resetFilters">条件クリア</button>
       </div>
       <div class="filters date-filter">
         <select id="dateFilterField">
@@ -1173,6 +1194,21 @@ function renderAll(){
   renderRolePanel();
   renderMatrix('groupMatrix', 'channel', 'チャネル', getFiltered({exclude:['channel']}), 'name');
   renderOwnerBoard();
+  updateFilterStatus();
+}
+
+// タブに関わらずどこからでも絞り込み状況を確認・解除できるよう、タブ横に表示を出す
+function hasActiveFilters(){
+  return activeStatuses.size > 0
+    || activeRoleTags.size > 0
+    || document.getElementById('channelFilter').value !== ''
+    || document.getElementById('listSourceFilter').value !== ''
+    || document.getElementById('textFilter').value.trim() !== ''
+    || document.getElementById('dateFilterFrom').value !== ''
+    || document.getElementById('dateFilterTo').value !== '';
+}
+function updateFilterStatus(){
+  document.getElementById('filterStatus').style.display = hasActiveFilters() ? 'flex' : 'none';
 }
 
 function renderRolePanel(){
@@ -1446,7 +1482,8 @@ function renderOwnerBoard(){
     return;
   }
 
-  const items = rawItems.filter(i => getOwnerName(i) === selectedOwner);
+  // 一覧タブのチャネル/ステータス/テキスト/期間フィルタを反映（担当者選択自体が役割絞り込みを兼ねるためroleTagsは除外）
+  const items = getFiltered({exclude:['roleTags']}).filter(i => getOwnerName(i) === selectedOwner);
   const activeItems = items.filter(i => !RESOLVED_STATUSES.includes(i.status || ''));
   const doneItems = items.filter(i => RESOLVED_STATUSES.includes(i.status || ''));
   syncGroupOrder();
