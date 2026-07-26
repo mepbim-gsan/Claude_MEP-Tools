@@ -1,10 +1,10 @@
 <!--
   @tool      DD-MEP タスク管理ダッシュボード
-  @version   v2026-07-24.11
+  @version   v2026-07-24.12
   @changelog
+    v2026-07-24.12 - 一覧タブで1人だけに絞り込んでいる場合、担当者別タブを開くとその人を自動選択するように変更
     v2026-07-24.11 - 担当者別タブにも一覧のフィルタ（チャネル/ステータス/テキスト/期間）を適用、条件クリアをタブ横に常設して全タブから操作可能に
     v2026-07-24.10 - 担当者別からチャネルクリックで一覧遷移する際、担当者・ステータスも一緒に引き継ぐよう修正（表示内容のブレを解消）
-    v2026-07-24.9 - チャネル名クリックで絞り込み（一覧・担当者別）、ヘッダー+タブをスクロール時も固定表示
 -->
 <!DOCTYPE html>
 <html lang="ja">
@@ -1115,8 +1115,32 @@ function init(){
 /* ---------- タブ切替 ---------- */
 function setupTabs(){
   document.querySelectorAll('.tab-btn').forEach(btn => {
-    btn.addEventListener('click', () => showView(btn.dataset.view));
+    btn.addEventListener('click', () => {
+      showView(btn.dataset.view);
+      if(btn.dataset.view === 'viewOwner') applyImpliedOwnerSelection();
+    });
   });
+}
+
+// activeRoleTagsが指す人物が1人だけに定まる場合、その名前を返す（役割の種類は問わない）
+function singleImpliedPerson(){
+  if(!activeRoleTags.size) return null;
+  const names = new Set([...activeRoleTags].map(tag => tag.slice(tag.indexOf(':') + 1)));
+  if(names.size !== 1) return null;
+  const [name] = names;
+  return name === '(未設定)' ? null : name;
+}
+
+// 一覧タブで1人だけに絞り込まれている状態で担当者別タブを開いたら、その人を自動選択する
+function applyImpliedOwnerSelection(){
+  const name = singleImpliedPerson();
+  if(!name) return;
+  const sel = document.getElementById('ownerSelect');
+  const hasOption = [...sel.options].some(o => o.value === name);
+  if(!hasOption || selectedOwner === name) return;
+  sel.value = name;
+  selectedOwner = name;
+  renderOwnerBoard();
 }
 function showView(name){
   document.querySelectorAll('.view').forEach(v => v.classList.toggle('active', v.id === name));
