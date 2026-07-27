@@ -1,10 +1,10 @@
 <!--
   @tool      DD-MEP タスク管理ダッシュボード
-  @version   v2026-07-27.3
+  @version   v2026-07-27.4
   @changelog
+    v2026-07-27.4 - 担当者別タブをステータス/チャネルとも一覧タブから独立させ、hiddenStatusesとownerActiveChannels（初期値はタスクチャネルのみ、複数選択パネル）でタブ内完結の絞り込みに統一
     v2026-07-27.3 - 設定タブ「①ステータスのグループ化」の表示順を、タブを開いた時だけグループ割り当て順に並び替えるよう変更（編集中は並び替えない）
     v2026-07-27.2 - 担当者別タブのチャネル名クリックを一覧タブへの遷移からタブ内完結の絞り込み（ownerChannelFocus）に変更
-    v2026-07-27 - チャネルフィルタをT/その他グループ分けの複数選択パネルに変更し、設定タブに初期チャネルフィルタ（defaultChannels）を追加
 -->
 <!DOCTYPE html>
 <html lang="ja">
@@ -865,6 +865,10 @@
     <div class="card">
       <p class="view-hint">担当者を選ぶと、その人の未完了タスクを優先表示します。完了タスクは折りたたみ表示です。</p>
       <select id="ownerSelect"><option value="">担当者を選択してください</option></select>
+      <details class="channel-filter-details" id="ownerChannelFilterDetails">
+        <summary id="ownerChannelFilterSummary">チャネル：すべて</summary>
+        <div class="channel-filter-panel" id="ownerChannelFilterPanel"></div>
+      </details>
       <div class="status-toggle" id="statusToggle"></div>
     </div>
     <div class="card" id="ownerBoardDetail"></div>
@@ -923,7 +927,7 @@ let activeRoleTags = new Set(); // 例: "owner:氏名", "member:氏名", "author
 let selectedOwner = null;
 let summaryViewMode = 'group'; // 'group' または 'status'
 let hiddenStatuses = new Set();
-let ownerChannelFocus = null; // 担当者別タブ内だけで完結するチャネル絞り込み（一覧タブのactiveChannelsとは独立）
+let ownerActiveChannels = new Set(); // 担当者別タブ内だけで完結するチャネル複数選択絞り込み（一覧タブのactiveChannelsとは独立、初期値はdefaultOwnerChannels()）
 let statusGroupSettingsOrder = []; // 設定タブ「①ステータスのグループ化」の表示順。開いた時だけ並び替え、編集中は維持する
 
 // 設定：Setting.json（基本）＋ localStorage（個人上書き）の二層構成
@@ -1060,18 +1064,14 @@ document.getElementById('tableBody').addEventListener('click', e => {
   renderAll();
 });
 document.getElementById('ownerBoardDetail').addEventListener('click', e => {
-  const clearBtn = e.target.closest('#ownerChannelClearBtn');
-  if(clearBtn){
-    ownerChannelFocus = null;
-    renderOwnerBoard();
-    return;
-  }
   const el = e.target.closest('.channel-link');
   if(!el) return;
   const c = el.dataset.channel;
-  // 一覧タブへは遷移せず、担当者別タブの中だけでそのチャネルに絞り込む（同じチャネルの再クリックで解除）
-  ownerChannelFocus = (ownerChannelFocus === c) ? null : c;
+  // 一覧タブへは遷移せず、担当者別タブ内のチャネル複数選択（ownerActiveChannels）をその場でON/OFF
+  if(ownerActiveChannels.has(c)) ownerActiveChannels.delete(c); else ownerActiveChannels.add(c);
+  syncOwnerChannelFilterUI();
   renderOwnerBoard();
+  renderOwnerStatusToggle();
 });
 
 function readSettingsFile(file){
@@ -1194,7 +1194,7 @@ function init(){
   activeChannels = new Set(settings.defaultChannels.filter(c => existingChannels.has(c)));
   activeRoleTags = new Set();
   selectedOwner = null;
-  ownerChannelFocus = null;
+  ownerActiveChannels = defaultOwnerChannels();
   hiddenStatuses = new Set();
   summaryViewMode = 'group';
   document.getElementById('textFilter').value = '';
@@ -1257,8 +1257,10 @@ function applyImpliedOwnerSelection(){
   if(!hasOption || selectedOwner === name) return;
   sel.value = name;
   selectedOwner = name;
-  ownerChannelFocus = null;
+  ownerActiveChannels = defaultOwnerChannels();
+  syncOwnerChannelFilterUI();
   renderOwnerBoard();
+  renderOwnerStatusToggle();
 }
 function showView(name){
   document.querySelectorAll('.view').forEach(v => v.classList.toggle('active', v.id === name));
@@ -1650,6 +1652,20 @@ function renderMatrix(containerId, groupField, groupLabel, items, sortMode){
 }
 
 /* ---------- 担当者ボード ---------- */
+// 担当者別タブのチャネル絞り込みの初期値：タスクチャネル（T始まり）だけを選択した状態
+function defaultOwnerChannels(){
+  return new Set(groupedChannels().task);
+}
+
+// 担当者別タブの対象タスク（選択中の担当者・タブ内完結のチャネル絞り込みを反映。
+// ステータスは一覧タブのactiveStatusesを継承せず、hiddenStatusesチップだけで個別に隠す）
+function ownerScopedItems(){
+  if(!selectedOwner) return [];
+  return getFiltered({exclude:['roleTags','channel','status']})
+    .filter(i => getOwnerName(i) === selectedOwner)
+    .filter(i => !ownerActiveChannels.size || ownerActiveChannels.has(i.channel || '(未設定)'));
+}
+
 function setupOwnerBoardControls(){
   const owners = [...new Set(rawItems.map(i => getOwnerName(i)))];
   const counted = owners.map(o => {
@@ -1663,18 +1679,80 @@ function setupOwnerBoardControls(){
     counted.map(c => `<option value="${escapeHtml(c.owner)}">${escapeHtml(c.owner)}（未完了${c.active}／全${c.total}）</option>`).join('');
   sel.addEventListener('change', () => {
     selectedOwner = sel.value || null;
-    ownerChannelFocus = null;
+    ownerActiveChannels = defaultOwnerChannels();
+    syncOwnerChannelFilterUI();
     // 選んだ担当者を一覧タブ側の役割タグにも反映し、タブを跨いでも「誰を見ているか」がズレないようにする
     activeRoleTags = selectedOwner ? new Set([`owner:${selectedOwner}`]) : new Set();
     renderAll();
   });
+
+  renderOwnerChannelFilterPanel();
 }
 
-// ステータス表示ON/OFFチップ：一覧タブのフィルタ（チャネル/ステータス/テキスト/期間）を反映して
+// activeChannelsに含まれるチャネルだけのチェックボックスパネルを、グループ見出し付きで描画する（一覧タブと同じ構造）
+function renderOwnerChannelFilterPanel(){
+  const { task, other } = groupedChannels();
+  const container = document.getElementById('ownerChannelFilterPanel');
+  container.innerHTML = `
+    <div class="channel-filter-group-title">
+      <span>タスクチャネル（Tで始まる）</span>
+      <span class="channel-filter-group-actions">
+        <button type="button" data-group="task" data-act="all">全選択</button>
+        <button type="button" data-group="task" data-act="none">全解除</button>
+      </span>
+    </div>
+    <div class="channel-filter-list" data-group="task">${channelGroupListHtml(task, ownerActiveChannels)}</div>
+    <div class="channel-filter-group-title">
+      <span>その他</span>
+      <span class="channel-filter-group-actions">
+        <button type="button" data-group="other" data-act="all">全選択</button>
+        <button type="button" data-group="other" data-act="none">全解除</button>
+      </span>
+    </div>
+    <div class="channel-filter-list" data-group="other">${channelGroupListHtml(other, ownerActiveChannels)}</div>
+  `;
+
+  container.querySelectorAll('input[type=checkbox]').forEach(cb => {
+    cb.addEventListener('change', () => {
+      const c = cb.dataset.channel;
+      if(cb.checked) ownerActiveChannels.add(c); else ownerActiveChannels.delete(c);
+      syncOwnerChannelFilterUI();
+      renderOwnerBoard();
+      renderOwnerStatusToggle();
+    });
+  });
+  container.querySelectorAll('button[data-group]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const values = btn.dataset.group === 'task' ? task : other;
+      if(btn.dataset.act === 'all') values.forEach(v => ownerActiveChannels.add(v));
+      else values.forEach(v => ownerActiveChannels.delete(v));
+      renderOwnerChannelFilterPanel();
+      syncOwnerChannelFilterUI();
+      renderOwnerBoard();
+      renderOwnerStatusToggle();
+    });
+  });
+
+  syncOwnerChannelFilterSummary();
+}
+
+// ownerActiveChannelsの状態をチェックボックスとサマリー表示に反映する（Set変更後の再同期用）
+function syncOwnerChannelFilterUI(){
+  document.querySelectorAll('#ownerChannelFilterPanel input[type=checkbox]').forEach(cb => {
+    cb.checked = ownerActiveChannels.has(cb.dataset.channel);
+  });
+  syncOwnerChannelFilterSummary();
+}
+function syncOwnerChannelFilterSummary(){
+  const summary = document.getElementById('ownerChannelFilterSummary');
+  summary.textContent = ownerActiveChannels.size ? `チャネル：${ownerActiveChannels.size}件選択中` : 'チャネル：すべて';
+}
+
+// ステータス表示ON/OFFチップ：担当者別タブの対象タスク（ownerScopedItems）を反映して
 // 対象外になったステータスのチップは出さないよう、renderAll()のたびに再構築する
 function renderOwnerStatusToggle(){
   syncGroupOrder();
-  const filteredItems = getFiltered({exclude:['roleTags']});
+  const filteredItems = ownerScopedItems();
   const statusCounts = countBy(filteredItems, i => i.status || '(未設定)');
   const activeStatusList = [...new Set(
     filteredItems.map(i => i.status || '(未設定)').filter(s => !RESOLVED_STATUSES.includes(s))
@@ -1703,12 +1781,7 @@ function renderOwnerBoard(){
     return;
   }
 
-  // 一覧タブのステータス/テキスト/期間フィルタは反映するが、チャネルはタブ内完結にするため
-  // グローバルなactiveChannelsは無視し、ownerChannelFocus（このタブだけのローカル状態）で絞り込む
-  // （担当者選択自体が役割絞り込みを兼ねるためroleTagsは除外）
-  const items = getFiltered({exclude:['roleTags','channel']})
-    .filter(i => getOwnerName(i) === selectedOwner)
-    .filter(i => !ownerChannelFocus || (i.channel || '(未設定)') === ownerChannelFocus);
+  const items = ownerScopedItems();
   const activeItems = items.filter(i => !RESOLVED_STATUSES.includes(i.status || ''));
   const doneItems = items.filter(i => RESOLVED_STATUSES.includes(i.status || ''));
   syncGroupOrder();
@@ -1723,9 +1796,6 @@ function renderOwnerBoard(){
     .sort(statusDisplayComparator(Object.fromEntries(Object.entries(statusGroups).map(([s, arr]) => [s, arr.length]))));
 
   let html = `<h3 class="board-owner-title">${escapeHtml(selectedOwner)} のタスク状況</h3>`;
-  if(ownerChannelFocus){
-    html += `<p class="view-hint">チャネル「${escapeHtml(ownerChannelFocus)}」で絞り込み中 <button type="button" class="reset-btn" id="ownerChannelClearBtn">解除</button></p>`;
-  }
 
   if(statusOrder.length === 0){
     html += '<div class="empty">表示対象の未完了タスクはありません（ステータス表示設定をご確認ください）</div>';
