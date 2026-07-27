@@ -1,10 +1,10 @@
 <!--
   @tool      DD-MEP タスク管理ダッシュボード
-  @version   v2026-07-24.13
+  @version   v2026-07-24.14
   @changelog
+    v2026-07-24.14 - 担当者別で担当者を選ぶと一覧タブのactiveRoleTagsにも反映するよう変更（一覧⇔担当者別の相互同期）
     v2026-07-24.13 - 担当者別タブのステータス選択チップが一覧のフィルタを反映していなかった不具合を修正（renderAll()のたびに再構築）
     v2026-07-24.12 - 一覧タブで1人だけに絞り込んでいる場合、担当者別タブを開くとその人を自動選択するように変更
-    v2026-07-24.11 - 担当者別タブにも一覧のフィルタ（チャネル/ステータス/テキスト/期間）を適用、条件クリアをタブ横に常設して全タブから操作可能に
 -->
 <!DOCTYPE html>
 <html lang="ja">
@@ -1475,7 +1475,9 @@ function setupOwnerBoardControls(){
     counted.map(c => `<option value="${escapeHtml(c.owner)}">${escapeHtml(c.owner)}（未完了${c.active}／全${c.total}）</option>`).join('');
   sel.addEventListener('change', () => {
     selectedOwner = sel.value || null;
-    renderOwnerBoard();
+    // 選んだ担当者を一覧タブ側の役割タグにも反映し、タブを跨いでも「誰を見ているか」がズレないようにする
+    activeRoleTags = selectedOwner ? new Set([`owner:${selectedOwner}`]) : new Set();
+    renderAll();
   });
 }
 
