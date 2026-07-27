@@ -1,10 +1,10 @@
 <!--
   @tool      DD-MEP タスク管理ダッシュボード
-  @version   v2026-07-27.4
+  @version   v2026-07-27.5
   @changelog
-    v2026-07-27.4 - 担当者別タブをステータス/チャネルとも一覧タブから独立させ、hiddenStatusesとownerActiveChannels（初期値はタスクチャネルのみ、複数選択パネル）でタブ内完結の絞り込みに統一
+    v2026-07-27.5 - 担当者別タブのチャネル名クリックを「1件に絞り込む」動作に統一、初期チャネルフィルタ設定を一覧・担当者別タブ共通に、チャネルフィルタパネルをパネル外クリックで閉じるように修正
+    v2026-07-27.4 - 担当者別タブをステータス/チャネルとも一覧タブから独立させ、hiddenStatusesとownerActiveChannels（複数選択パネル）でタブ内完結の絞り込みに統一
     v2026-07-27.3 - 設定タブ「①ステータスのグループ化」の表示順を、タブを開いた時だけグループ割り当て順に並び替えるよう変更（編集中は並び替えない）
-    v2026-07-27.2 - 担当者別タブのチャネル名クリックを一覧タブへの遷移からタブ内完結の絞り込み（ownerChannelFocus）に変更
 -->
 <!DOCTYPE html>
 <html lang="ja">
@@ -908,8 +908,8 @@
     </div>
 
     <div class="card">
-      <h3 class="settings-section-title">④ 一覧タブの初期チャネルフィルタ</h3>
-      <p class="view-hint">一覧タブを開いたときに、最初からONにしておくチャネルを選びます（Tで始まる＝タスクチャネル／それ以外で分類）。</p>
+      <h3 class="settings-section-title">④ 初期チャネルフィルタ（一覧・担当者別共通）</h3>
+      <p class="view-hint">一覧タブを開いたとき、および担当者別タブで担当者を選んだときに、最初からONにしておくチャネルを選びます（Tで始まる＝タスクチャネル／それ以外で分類）。</p>
       <div class="channel-filter-list" id="defaultChannelSetting"></div>
     </div>
   </div>
@@ -1066,12 +1066,22 @@ document.getElementById('tableBody').addEventListener('click', e => {
 document.getElementById('ownerBoardDetail').addEventListener('click', e => {
   const el = e.target.closest('.channel-link');
   if(!el) return;
-  const c = el.dataset.channel;
-  // 一覧タブへは遷移せず、担当者別タブ内のチャネル複数選択（ownerActiveChannels）をその場でON/OFF
-  if(ownerActiveChannels.has(c)) ownerActiveChannels.delete(c); else ownerActiveChannels.add(c);
+  // 一覧タブ・チャネル別タブと同じ「クリックしたチャネル1件に絞り込む」挙動に統一（一覧タブへは遷移しない）
+  ownerActiveChannels = new Set([el.dataset.channel]);
   syncOwnerChannelFilterUI();
   renderOwnerBoard();
   renderOwnerStatusToggle();
+});
+
+// チャネル絞り込みパネル（一覧タブ・担当者別タブ共通）：パネル外をクリック/タップしたら閉じる
+// 「全選択/全解除」ボタンはクリック時にパネルを再描画（innerHTML差し替え）するため、
+// バブリング時点ではe.targetがDOMから外れてしまう。composedPath()はイベント発生時点の経路を
+// 保持するのでその影響を受けない
+document.addEventListener('click', e => {
+  const path = e.composedPath();
+  document.querySelectorAll('details.channel-filter-details[open]').forEach(details => {
+    if(!path.includes(details)) details.open = false;
+  });
 });
 
 function readSettingsFile(file){
@@ -1652,9 +1662,10 @@ function renderMatrix(containerId, groupField, groupLabel, items, sortMode){
 }
 
 /* ---------- 担当者ボード ---------- */
-// 担当者別タブのチャネル絞り込みの初期値：タスクチャネル（T始まり）だけを選択した状態
+// 担当者別タブのチャネル絞り込みの初期値：設定タブ「④初期チャネルフィルタ」の値を一覧タブと共通で使う
 function defaultOwnerChannels(){
-  return new Set(groupedChannels().task);
+  const existingChannels = new Set(rawItems.map(i => i.channel || '(未設定)'));
+  return new Set(settings.defaultChannels.filter(c => existingChannels.has(c)));
 }
 
 // 担当者別タブの対象タスク（選択中の担当者・タブ内完結のチャネル絞り込みを反映。
