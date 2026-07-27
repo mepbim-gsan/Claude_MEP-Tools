@@ -1,10 +1,10 @@
 <!--
   @tool      DD-MEP タスク管理ダッシュボード
-  @version   v2026-07-27.5
+  @version   v2026-07-27.6
   @changelog
+    v2026-07-27.6 - 条件クリアが担当者別タブの担当者選択・タブローカルなチャネル/ステータス状態を戻していなかった不具合を修正（押しても表示が変わらない問題）。担当者別タブのチャネルフィルタとステータスチップの間隔が詰まっていたのを修正
     v2026-07-27.5 - 担当者別タブのチャネル名クリックを「1件に絞り込む」動作に統一、初期チャネルフィルタ設定を一覧・担当者別タブ共通に、チャネルフィルタパネルをパネル外クリックで閉じるように修正
     v2026-07-27.4 - 担当者別タブをステータス/チャネルとも一覧タブから独立させ、hiddenStatusesとownerActiveChannels（複数選択パネル）でタブ内完結の絞り込みに統一
-    v2026-07-27.3 - 設定タブ「①ステータスのグループ化」の表示順を、タブを開いた時だけグループ割り当て順に並び替えるよう変更（編集中は並び替えない）
 -->
 <!DOCTYPE html>
 <html lang="ja">
@@ -333,6 +333,7 @@
   .channel-filter-details{
     flex:1 1 160px;
     position:relative;
+    margin-bottom:10px;
   }
   .channel-filter-details summary{
     padding:6px 8px;
@@ -1230,6 +1231,13 @@ function init(){
     activeChannels = new Set();
     activeRoleTags = new Set();
     syncChannelFilterUI();
+    // 担当者別タブの状態（担当者選択・タブローカルなチャネル/ステータス絞り込み）も、
+    // タブをまたいで見えている「絞り込み中」表示と矛盾しないよう、あわせて完全リセットする
+    selectedOwner = null;
+    document.getElementById('ownerSelect').value = '';
+    ownerActiveChannels = new Set();
+    syncOwnerChannelFilterUI();
+    hiddenStatuses = new Set();
     renderAll();
   });
   renderAll();
