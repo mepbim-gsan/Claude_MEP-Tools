@@ -1,10 +1,10 @@
 <!--
   @tool      DD-MEP タスク管理ダッシュボード
-  @version   v2026-07-24.15
+  @version   v2026-07-27
   @changelog
+    v2026-07-27 - チャネルフィルタをT/その他グループ分けの複数選択パネルに変更し、設定タブに初期チャネルフィルタ（defaultChannels）を追加
     v2026-07-24.15 - 一覧タブの役割パネル（担当者・関係者・投稿者）を折りたたみ可能に変更、初期状態は閉じてタスク一覧の可視領域を確保
     v2026-07-24.14 - 担当者別で担当者を選ぶと一覧タブのactiveRoleTagsにも反映するよう変更（一覧⇔担当者別の相互同期）
-    v2026-07-24.13 - 担当者別タブのステータス選択チップが一覧のフィルタを反映していなかった不具合を修正（renderAll()のたびに再構築）
 -->
 <!DOCTYPE html>
 <html lang="ja">
@@ -328,6 +328,65 @@
     background:#fff;
     font-size:0.8rem;
     color:var(--sub);
+    cursor:pointer;
+  }
+  .channel-filter-details{
+    flex:1 1 160px;
+    position:relative;
+  }
+  .channel-filter-details summary{
+    padding:6px 8px;
+    border:1px solid var(--border);
+    border-radius:6px;
+    font-size:0.85rem;
+    background:#fff;
+    cursor:pointer;
+    list-style:none;
+  }
+  .channel-filter-details summary::-webkit-details-marker{ display:none; }
+  .channel-filter-panel{
+    position:absolute;
+    z-index:20;
+    top:calc(100% + 4px);
+    left:0;
+    min-width:260px;
+    max-height:320px;
+    overflow:auto;
+    background:#fff;
+    border:1px solid var(--border);
+    border-radius:8px;
+    padding:10px;
+    box-shadow:0 4px 12px rgba(0,0,0,0.14);
+  }
+  .channel-filter-group-title{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:8px;
+    font-size:0.75rem;
+    font-weight:600;
+    color:var(--sub);
+    margin:8px 0 4px;
+  }
+  .channel-filter-group-title:first-child{ margin-top:0; }
+  .channel-filter-group-actions button{
+    border:none;
+    background:none;
+    color:var(--accent);
+    font-size:0.72rem;
+    cursor:pointer;
+    padding:0 4px;
+  }
+  .channel-filter-list{
+    display:flex;
+    flex-direction:column;
+    gap:4px;
+  }
+  .channel-filter-list label{
+    display:flex;
+    align-items:center;
+    gap:6px;
+    font-size:0.82rem;
     cursor:pointer;
   }
   .date-filter{
@@ -688,6 +747,8 @@
     .summary .stat{ flex:1 1 72px; padding:6px 8px; }
     .summary .stat .num{ font-size:1.1rem; }
     .filters select, .filters input[type=text], .filters input[type=date]{ flex:1 1 100%; }
+    .channel-filter-details{ flex:1 1 100%; }
+    .channel-filter-panel{ left:0; right:0; min-width:0; }
     .date-filter select{ flex:1 1 100%; }
     table{ font-size:0.75rem; }
     th,td{ padding:5px 4px; }
@@ -753,7 +814,10 @@
     <div class="card">
       <div class="filters">
         <input type="text" id="textFilter" placeholder="タイトルで検索">
-        <select id="channelFilter"><option value="">チャネル：すべて</option></select>
+        <details class="channel-filter-details" id="channelFilterDetails">
+          <summary id="channelFilterSummary">チャネル：すべて</summary>
+          <div class="channel-filter-panel" id="channelFilterPanel"></div>
+        </details>
         <select id="listSourceFilter"><option value="">リスト：すべて</option></select>
       </div>
       <div class="filters date-filter">
@@ -838,6 +902,12 @@
       <p class="view-hint">一覧タブを開いたときに、最初からONにしておくステータス（サマリーカード）を選びます。</p>
       <div class="hidden-people-list" id="defaultStatusSetting"></div>
     </div>
+
+    <div class="card">
+      <h3 class="settings-section-title">④ 一覧タブの初期チャネルフィルタ</h3>
+      <p class="view-hint">一覧タブを開いたときに、最初からONにしておくチャネルを選びます（Tで始まる＝タスクチャネル／それ以外で分類）。</p>
+      <div class="channel-filter-list" id="defaultChannelSetting"></div>
+    </div>
   </div>
 
 </div>
@@ -848,6 +918,7 @@
 let rawItems = [];
 let sortState = { key: 'date', dir: 'desc' };
 let activeStatuses = new Set();
+let activeChannels = new Set();
 let activeRoleTags = new Set(); // 例: "owner:氏名", "member:氏名", "author:氏名"
 let selectedOwner = null;
 let summaryViewMode = 'group'; // 'group' または 'status'
@@ -856,8 +927,8 @@ let hiddenStatuses = new Set();
 // 設定：Setting.json（基本）＋ localStorage（個人上書き）の二層構成
 // statusGroupMap: { "ステータス名": "グループ名" }
 // hiddenPeople: ["表示しない人の名前", ...]
-let settings = { statusGroupMap: {}, hiddenPeople: [], groupOrder: [], defaultStatuses: [], statusColorMap: {} };
-let baseSettingsFromFile = { statusGroupMap: {}, hiddenPeople: [], groupOrder: [], defaultStatuses: [], statusColorMap: {} };
+let settings = { statusGroupMap: {}, hiddenPeople: [], groupOrder: [], defaultStatuses: [], defaultChannels: [], statusColorMap: {} };
+let baseSettingsFromFile = { statusGroupMap: {}, hiddenPeople: [], groupOrder: [], defaultStatuses: [], defaultChannels: [], statusColorMap: {} };
 const SETTINGS_LS_KEY = 'ddmepDashboardSettingsOverride';
 
 // ここに含まれるステータスは「完了扱い」として担当者ボードで折りたたみ表示します
@@ -980,13 +1051,15 @@ document.getElementById('resetLocalSettingsBtn').addEventListener('click', () =>
 document.getElementById('tableBody').addEventListener('click', e => {
   const el = e.target.closest('.channel-link');
   if(!el) return;
-  document.getElementById('channelFilter').value = el.dataset.channel;
+  activeChannels = new Set([el.dataset.channel]);
+  syncChannelFilterUI();
   renderAll();
 });
 document.getElementById('ownerBoardDetail').addEventListener('click', e => {
   const el = e.target.closest('.channel-link');
   if(!el) return;
-  document.getElementById('channelFilter').value = el.dataset.channel;
+  activeChannels = new Set([el.dataset.channel]);
+  syncChannelFilterUI();
   // 担当者別からの遷移時は、見ていた担当者とそのタスクのステータスも一覧側に引き継ぎ、表示内容がブレないようにする
   activeRoleTags = selectedOwner ? new Set([`owner:${selectedOwner}`]) : new Set();
   activeStatuses = el.dataset.status ? new Set([el.dataset.status]) : new Set();
@@ -1012,8 +1085,15 @@ function normalizeSettings(obj){
     hiddenPeople: (obj && Array.isArray(obj.hiddenPeople)) ? obj.hiddenPeople : [],
     groupOrder: (obj && Array.isArray(obj.groupOrder)) ? obj.groupOrder : [],
     defaultStatuses: (obj && Array.isArray(obj.defaultStatuses)) ? obj.defaultStatuses : [],
+    defaultChannels: (obj && Array.isArray(obj.defaultChannels)) ? obj.defaultChannels : [],
     statusColorMap: (obj && typeof obj.statusColorMap === 'object' && obj.statusColorMap) || {}
   };
+}
+
+// チャネル名が「T」で始まるものは「タスクチャネル」、それ以外は「その他」として分類する
+// （運用上の命名規則。REQUIREMENTS.md 7章参照）
+function isTaskChannel(channel){
+  return /^T/.test(channel || '');
 }
 
 // groupOrderを現在存在するグループと同期（削除されたグループを除去、新規グループを末尾に追加）
@@ -1094,6 +1174,8 @@ function init(){
   document.getElementById('tabsBar').style.display = 'flex';
   const existingStatuses = new Set(rawItems.map(i => i.status || '(未設定)'));
   activeStatuses = new Set(settings.defaultStatuses.filter(s => existingStatuses.has(s)));
+  const existingChannels = new Set(rawItems.map(i => i.channel || '(未設定)'));
+  activeChannels = new Set(settings.defaultChannels.filter(c => existingChannels.has(c)));
   activeRoleTags = new Set();
   selectedOwner = null;
   hiddenStatuses = new Set();
@@ -1108,15 +1190,18 @@ function init(){
   setupOwnerBoardControls();
   setupSummaryModeToggle();
   setupDefaultStatusSetting();
+  setupDefaultChannelSetting();
   renderSettingsTab();
   document.getElementById('resetFilters').addEventListener('click', () => {
-    ['channelFilter','listSourceFilter'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('listSourceFilter').value = '';
     document.getElementById('textFilter').value = '';
     document.getElementById('dateFilterField').value = 'date';
     document.getElementById('dateFilterFrom').value = '';
     document.getElementById('dateFilterTo').value = '';
     activeStatuses = new Set();
+    activeChannels = new Set();
     activeRoleTags = new Set();
+    syncChannelFilterUI();
     renderAll();
   });
   renderAll();
@@ -1158,16 +1243,22 @@ function showView(name){
 }
 
 /* ---------- フィルタ ---------- */
+// チャネル一覧を「タスクチャネル（Tで始まる）」「その他」の2グループに分けて返す
+function groupedChannels(){
+  const channels = [...new Set(rawItems.map(i => i.channel || '(未設定)'))];
+  return {
+    task: channels.filter(isTaskChannel).sort(),
+    other: channels.filter(c => !isTaskChannel(c)).sort()
+  };
+}
+
 function buildFilters(){
-  const channels = [...new Set(rawItems.map(i => i.channel || '(未設定)'))].sort();
   const listSources = [...new Set(rawItems.map(i => i._sourceList || '(未設定)'))].sort();
 
-  fillSelect('channelFilter', 'チャネル：すべて', channels);
+  renderChannelFilterPanel();
   fillSelect('listSourceFilter', 'リスト：すべて', listSources);
 
-  ['channelFilter','listSourceFilter'].forEach(id =>
-    document.getElementById(id).addEventListener('change', renderAll)
-  );
+  document.getElementById('listSourceFilter').addEventListener('change', renderAll);
   document.getElementById('textFilter').addEventListener('input', renderAll);
   ['dateFilterField','dateFilterFrom','dateFilterTo'].forEach(id =>
     document.getElementById(id).addEventListener('change', renderAll)
@@ -1179,9 +1270,72 @@ function fillSelect(id, allLabel, values){
     values.map(v => `<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join('');
 }
 
+// activeChannelsに含まれるチャネルだけのチェックボックスパネルを、グループ見出し付きで描画する
+function channelGroupListHtml(values, checkedSet){
+  return values.map(v => {
+    const checked = checkedSet.has(v) ? ' checked' : '';
+    return `<label><input type="checkbox" data-channel="${escapeHtml(v)}"${checked}>${escapeHtml(v)}</label>`;
+  }).join('') || '<div class="empty">データがありません</div>';
+}
+
+function renderChannelFilterPanel(){
+  const { task, other } = groupedChannels();
+  const container = document.getElementById('channelFilterPanel');
+  container.innerHTML = `
+    <div class="channel-filter-group-title">
+      <span>タスクチャネル（Tで始まる）</span>
+      <span class="channel-filter-group-actions">
+        <button type="button" data-group="task" data-act="all">全選択</button>
+        <button type="button" data-group="task" data-act="none">全解除</button>
+      </span>
+    </div>
+    <div class="channel-filter-list" data-group="task">${channelGroupListHtml(task, activeChannels)}</div>
+    <div class="channel-filter-group-title">
+      <span>その他</span>
+      <span class="channel-filter-group-actions">
+        <button type="button" data-group="other" data-act="all">全選択</button>
+        <button type="button" data-group="other" data-act="none">全解除</button>
+      </span>
+    </div>
+    <div class="channel-filter-list" data-group="other">${channelGroupListHtml(other, activeChannels)}</div>
+  `;
+
+  container.querySelectorAll('input[type=checkbox]').forEach(cb => {
+    cb.addEventListener('change', () => {
+      const c = cb.dataset.channel;
+      if(cb.checked) activeChannels.add(c); else activeChannels.delete(c);
+      syncChannelFilterUI();
+      renderAll();
+    });
+  });
+  container.querySelectorAll('button[data-group]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const values = btn.dataset.group === 'task' ? task : other;
+      if(btn.dataset.act === 'all') values.forEach(v => activeChannels.add(v));
+      else values.forEach(v => activeChannels.delete(v));
+      renderChannelFilterPanel();
+      syncChannelFilterUI();
+      renderAll();
+    });
+  });
+
+  syncChannelFilterSummary();
+}
+
+// activeChannelsの状態をチェックボックスとサマリー表示に反映する（Set変更後の再同期用）
+function syncChannelFilterUI(){
+  document.querySelectorAll('#channelFilterPanel input[type=checkbox]').forEach(cb => {
+    cb.checked = activeChannels.has(cb.dataset.channel);
+  });
+  syncChannelFilterSummary();
+}
+function syncChannelFilterSummary(){
+  const summary = document.getElementById('channelFilterSummary');
+  summary.textContent = activeChannels.size ? `チャネル：${activeChannels.size}件選択中` : 'チャネル：すべて';
+}
+
 function getFiltered(options){
   const exclude = (options && options.exclude) || [];
-  const channel = document.getElementById('channelFilter').value;
   const listSource = document.getElementById('listSourceFilter').value;
   const text = document.getElementById('textFilter').value.trim().toLowerCase();
   const dateField = document.getElementById('dateFilterField').value;
@@ -1191,7 +1345,7 @@ function getFiltered(options){
     const status = i.status || '(未設定)';
     const owner = getOwnerName(i);
     if(!exclude.includes('status') && activeStatuses.size && !activeStatuses.has(status)) return false;
-    if(!exclude.includes('channel') && channel && (i.channel || '(未設定)') !== channel) return false;
+    if(!exclude.includes('channel') && activeChannels.size && !activeChannels.has(i.channel || '(未設定)')) return false;
     if(!exclude.includes('listSource') && listSource && (i._sourceList || '(未設定)') !== listSource) return false;
     if(text && !(i.title || '').toLowerCase().includes(text)) return false;
     if(dateFrom || dateTo){
@@ -1236,7 +1390,7 @@ function renderAll(){
 function hasActiveFilters(){
   return activeStatuses.size > 0
     || activeRoleTags.size > 0
-    || document.getElementById('channelFilter').value !== ''
+    || activeChannels.size > 0
     || document.getElementById('listSourceFilter').value !== ''
     || document.getElementById('textFilter').value.trim() !== ''
     || document.getElementById('dateFilterFrom').value !== ''
@@ -1463,7 +1617,8 @@ function renderMatrix(containerId, groupField, groupLabel, items, sortMode){
     btn.addEventListener('click', () => {
       const value = btn.dataset.value;
       const status = btn.dataset.status;
-      document.getElementById('channelFilter').value = value;
+      activeChannels = new Set([value]);
+      syncChannelFilterUI();
       activeStatuses = new Set([status]);
       renderAll();
       showView('viewList');
@@ -1588,6 +1743,7 @@ function renderSettingsTab(){
   renderStatusGroupSettings();
   renderHiddenPeopleSettings();
   renderDefaultStatusSetting();
+  renderDefaultChannelSetting();
 }
 
 function renderGroupManagement(){
@@ -1735,6 +1891,31 @@ function setupDefaultStatusSetting(){
       if(!settings.defaultStatuses.includes(s)) settings.defaultStatuses.push(s);
     }else{
       settings.defaultStatuses = settings.defaultStatuses.filter(v => v !== s);
+    }
+    onSettingsChanged();
+  });
+}
+
+function renderDefaultChannelSetting(){
+  const container = document.getElementById('defaultChannelSetting');
+  const { task, other } = groupedChannels();
+  container.innerHTML = `
+    <div class="channel-filter-group-title"><span>タスクチャネル（Tで始まる）</span></div>
+    ${channelGroupListHtml(task, new Set(settings.defaultChannels))}
+    <div class="channel-filter-group-title"><span>その他</span></div>
+    ${channelGroupListHtml(other, new Set(settings.defaultChannels))}
+  `;
+}
+
+function setupDefaultChannelSetting(){
+  document.getElementById('defaultChannelSetting').addEventListener('change', e => {
+    const cb = e.target.closest('input[type=checkbox]');
+    if(!cb) return;
+    const c = cb.dataset.channel;
+    if(cb.checked){
+      if(!settings.defaultChannels.includes(c)) settings.defaultChannels.push(c);
+    }else{
+      settings.defaultChannels = settings.defaultChannels.filter(v => v !== c);
     }
     onSettingsChanged();
   });
