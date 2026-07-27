@@ -1,10 +1,10 @@
 <!--
   @tool      DD-MEP タスク管理ダッシュボード
-  @version   v2026-07-27
+  @version   v2026-07-27.2
   @changelog
+    v2026-07-27.2 - 担当者別タブのチャネル名クリックを一覧タブへの遷移からタブ内完結の絞り込み（ownerChannelFocus）に変更
     v2026-07-27 - チャネルフィルタをT/その他グループ分けの複数選択パネルに変更し、設定タブに初期チャネルフィルタ（defaultChannels）を追加
     v2026-07-24.15 - 一覧タブの役割パネル（担当者・関係者・投稿者）を折りたたみ可能に変更、初期状態は閉じてタスク一覧の可視領域を確保
-    v2026-07-24.14 - 担当者別で担当者を選ぶと一覧タブのactiveRoleTagsにも反映するよう変更（一覧⇔担当者別の相互同期）
 -->
 <!DOCTYPE html>
 <html lang="ja">
@@ -923,6 +923,7 @@ let activeRoleTags = new Set(); // 例: "owner:氏名", "member:氏名", "author
 let selectedOwner = null;
 let summaryViewMode = 'group'; // 'group' または 'status'
 let hiddenStatuses = new Set();
+let ownerChannelFocus = null; // 担当者別タブ内だけで完結するチャネル絞り込み（一覧タブのactiveChannelsとは独立）
 
 // 設定：Setting.json（基本）＋ localStorage（個人上書き）の二層構成
 // statusGroupMap: { "ステータス名": "グループ名" }
@@ -1047,7 +1048,7 @@ document.getElementById('resetLocalSettingsBtn').addEventListener('click', () =>
   }
 });
 
-// チャネル名クリックで絞り込み（一覧タブ・担当者別タブ共通、イベント委譲）
+// チャネル名クリックで絞り込み（一覧タブ・担当者別タブそれぞれのタブ内で完結、イベント委譲）
 document.getElementById('tableBody').addEventListener('click', e => {
   const el = e.target.closest('.channel-link');
   if(!el) return;
@@ -1056,15 +1057,18 @@ document.getElementById('tableBody').addEventListener('click', e => {
   renderAll();
 });
 document.getElementById('ownerBoardDetail').addEventListener('click', e => {
+  const clearBtn = e.target.closest('#ownerChannelClearBtn');
+  if(clearBtn){
+    ownerChannelFocus = null;
+    renderOwnerBoard();
+    return;
+  }
   const el = e.target.closest('.channel-link');
   if(!el) return;
-  activeChannels = new Set([el.dataset.channel]);
-  syncChannelFilterUI();
-  // 担当者別からの遷移時は、見ていた担当者とそのタスクのステータスも一覧側に引き継ぎ、表示内容がブレないようにする
-  activeRoleTags = selectedOwner ? new Set([`owner:${selectedOwner}`]) : new Set();
-  activeStatuses = el.dataset.status ? new Set([el.dataset.status]) : new Set();
-  renderAll();
-  showView('viewList');
+  const c = el.dataset.channel;
+  // 一覧タブへは遷移せず、担当者別タブの中だけでそのチャネルに絞り込む（同じチャネルの再クリックで解除）
+  ownerChannelFocus = (ownerChannelFocus === c) ? null : c;
+  renderOwnerBoard();
 });
 
 function readSettingsFile(file){
@@ -1178,6 +1182,7 @@ function init(){
   activeChannels = new Set(settings.defaultChannels.filter(c => existingChannels.has(c)));
   activeRoleTags = new Set();
   selectedOwner = null;
+  ownerChannelFocus = null;
   hiddenStatuses = new Set();
   summaryViewMode = 'group';
   document.getElementById('textFilter').value = '';
@@ -1235,6 +1240,7 @@ function applyImpliedOwnerSelection(){
   if(!hasOption || selectedOwner === name) return;
   sel.value = name;
   selectedOwner = name;
+  ownerChannelFocus = null;
   renderOwnerBoard();
 }
 function showView(name){
@@ -1640,6 +1646,7 @@ function setupOwnerBoardControls(){
     counted.map(c => `<option value="${escapeHtml(c.owner)}">${escapeHtml(c.owner)}（未完了${c.active}／全${c.total}）</option>`).join('');
   sel.addEventListener('change', () => {
     selectedOwner = sel.value || null;
+    ownerChannelFocus = null;
     // 選んだ担当者を一覧タブ側の役割タグにも反映し、タブを跨いでも「誰を見ているか」がズレないようにする
     activeRoleTags = selectedOwner ? new Set([`owner:${selectedOwner}`]) : new Set();
     renderAll();
@@ -1679,8 +1686,12 @@ function renderOwnerBoard(){
     return;
   }
 
-  // 一覧タブのチャネル/ステータス/テキスト/期間フィルタを反映（担当者選択自体が役割絞り込みを兼ねるためroleTagsは除外）
-  const items = getFiltered({exclude:['roleTags']}).filter(i => getOwnerName(i) === selectedOwner);
+  // 一覧タブのステータス/テキスト/期間フィルタは反映するが、チャネルはタブ内完結にするため
+  // グローバルなactiveChannelsは無視し、ownerChannelFocus（このタブだけのローカル状態）で絞り込む
+  // （担当者選択自体が役割絞り込みを兼ねるためroleTagsは除外）
+  const items = getFiltered({exclude:['roleTags','channel']})
+    .filter(i => getOwnerName(i) === selectedOwner)
+    .filter(i => !ownerChannelFocus || (i.channel || '(未設定)') === ownerChannelFocus);
   const activeItems = items.filter(i => !RESOLVED_STATUSES.includes(i.status || ''));
   const doneItems = items.filter(i => RESOLVED_STATUSES.includes(i.status || ''));
   syncGroupOrder();
@@ -1695,6 +1706,9 @@ function renderOwnerBoard(){
     .sort(statusDisplayComparator(Object.fromEntries(Object.entries(statusGroups).map(([s, arr]) => [s, arr.length]))));
 
   let html = `<h3 class="board-owner-title">${escapeHtml(selectedOwner)} のタスク状況</h3>`;
+  if(ownerChannelFocus){
+    html += `<p class="view-hint">チャネル「${escapeHtml(ownerChannelFocus)}」で絞り込み中 <button type="button" class="reset-btn" id="ownerChannelClearBtn">解除</button></p>`;
+  }
 
   if(statusOrder.length === 0){
     html += '<div class="empty">表示対象の未完了タスクはありません（ステータス表示設定をご確認ください）</div>';
