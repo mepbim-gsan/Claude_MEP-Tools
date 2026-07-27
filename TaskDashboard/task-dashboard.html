@@ -1,10 +1,10 @@
 <!--
   @tool      DD-MEP タスク管理ダッシュボード
-  @version   v2026-07-24.14
+  @version   v2026-07-24.15
   @changelog
+    v2026-07-24.15 - 一覧タブの役割パネル（担当者・関係者・投稿者）を折りたたみ可能に変更、初期状態は閉じてタスク一覧の可視領域を確保
     v2026-07-24.14 - 担当者別で担当者を選ぶと一覧タブのactiveRoleTagsにも反映するよう変更（一覧⇔担当者別の相互同期）
     v2026-07-24.13 - 担当者別タブのステータス選択チップが一覧のフィルタを反映していなかった不具合を修正（renderAll()のたびに再構築）
-    v2026-07-24.12 - 一覧タブで1人だけに絞り込んでいる場合、担当者別タブを開くとその人を自動選択するように変更
 -->
 <!DOCTYPE html>
 <html lang="ja">
@@ -548,6 +548,15 @@
     color:var(--sub);
     padding:6px 0;
   }
+  .role-panel-summary{
+    cursor:pointer;
+    font-size:0.9rem;
+    font-weight:600;
+    color:var(--text);
+  }
+  .role-panel-details[open] .role-panel-summary{
+    margin-bottom:10px;
+  }
   .done-details .task-card{
     border-left-color:#9ca3af;
     opacity:0.8;
@@ -728,7 +737,8 @@
     </div>
     <div class="card summary" id="summaryCards"></div>
 
-    <div class="card">
+    <details class="card role-panel-details">
+      <summary class="role-panel-summary">役割で絞り込み（担当者・関係者・投稿者）</summary>
       <p class="view-hint">名前をタップすると担当者・関係者・投稿者をまとめて絞り込みます。各件数バッジは個別にON/OFFできます。</p>
       <div class="table-wrap role-panel-wrap">
         <table class="role-table">
@@ -738,7 +748,7 @@
           <tbody id="rolePanelBody"></tbody>
         </table>
       </div>
-    </div>
+    </details>
 
     <div class="card">
       <div class="filters">
