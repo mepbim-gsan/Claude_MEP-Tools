@@ -107,8 +107,9 @@
 
 上部にタブ切替：**一覧 / チャネル別 / 担当者別 / 設定**（タイトル・ロード欄を含むヘッダーごとスクロール時も画面上部に固定表示される `sticky-header`）
 - タブ行の右側に「絞り込み中」表示＋「条件クリア」ボタン（`#filterStatus`）。いずれかのフィルタが有効な間だけ表示され、どのタブからでも一括クリアできる（`hasActiveFilters()`で判定）
-- 「条件クリア」（`resetFilters`）は、押した時点で見えている状態をすべて未選択の状態に戻す。グローバルなフィルタ（`activeStatuses`/`activeChannels`/`activeRoleTags`/テキスト/期間/リスト）に加えて、担当者別タブの状態（`selectedOwner`とプルダウン表示、タブローカルな`ownerActiveChannels`・`hiddenStatuses`）もあわせてリセットする（2026-07-27.6〜）。
-  担当者別タブで担当者を選ぶと`activeRoleTags`が連動して「絞り込み中」表示が出る仕組み上、`activeRoleTags`だけをクリアして担当者選択を残すと、バナーは消えるのに担当者別タブの表示は何も変わらず「押しても何も変わらない」状態になってしまうため、両者を必ず同時にクリアする
+- 「条件クリア」（`resetFilters`）は、**「何を絞り込んでいるか」という条件だけ**をクリアする。グローバルなフィルタ（`activeStatuses`/`activeChannels`/`activeRoleTags`/テキスト/期間/リスト）と、担当者別タブでその人の中をさらに絞り込んでいる条件（タブローカルな`ownerActiveChannels`・`hiddenStatuses`）が対象（2026-07-27.7〜）。
+  **`selectedOwner`（「誰を見ているか」というプルダウンの選択）はクリアしない**。担当者選択は絞り込み条件ではなく閲覧対象の選択であり、条件クリアの対象外（2026-07-27.6で一度selectedOwnerも含めて全リセットする実装にしたが、「担当者選択までクリアする必要はない」との指摘を受けて2026-07-27.7で撤回）
+  - 担当者別タブで担当者を選ぶと`activeRoleTags`が連動して「絞り込み中」表示が出る。条件クリアは`activeRoleTags`をクリアするため、`selectedOwner`はそのままでもバナーは正しく消える（`hasActiveFilters()`は`selectedOwner`ではなく`activeRoleTags`を見て判定しているため）
 
 ### 3.1 「一覧」タブ
 
@@ -205,7 +206,7 @@
 - チャネル別タブ：`renderMatrix`は`getFiltered({exclude:['channel']})`で反映（自軸のチャネルだけ除外し、他の全チャネルを見せて検索窓口として機能させる）
 - 担当者別タブ：`ownerScopedItems()`が`getFiltered({exclude:['roleTags','channel','status']})`を使う。テキスト/期間/リストは一覧タブと共有するが、ステータス・チャネルは共有せず、担当者別タブ専用のローカル状態（`hiddenStatuses`／`ownerActiveChannels`）で独自に絞り込む
 
-全タブから参照できるよう、タブ行に「絞り込み中」表示＋「条件クリア」ボタンを常設（3章参照）。「絞り込み中」表示の判定（`hasActiveFilters()`）は`activeStatuses`/`activeChannels`/`activeRoleTags`/テキスト/期間/リストのみを見る（タブローカルな状態はここに含めない。含めると担当者別タブを開いただけで常時バナーが出てしまうため）。一方で「条件クリア」（`resetFilters`）を押したときは、タブローカルな状態（`hiddenStatuses`、`ownerActiveChannels`、`selectedOwner`）も含めて全部リセットする（2026-07-27.6〜。担当者選択とセットで`activeRoleTags`が動くため、クリア時に選択だけ残ると表示が変わらず「押しても反応しない」ように見えるバグがあった）。
+全タブから参照できるよう、タブ行に「絞り込み中」表示＋「条件クリア」ボタンを常設（3章参照）。「絞り込み中」表示の判定（`hasActiveFilters()`）は`activeStatuses`/`activeChannels`/`activeRoleTags`/テキスト/期間/リストのみを見る（タブローカルな状態はここに含めない。含めると担当者別タブを開いただけで常時バナーが出てしまうため）。「条件クリア」（`resetFilters`）を押したときは、これらグローバルなフィルタに加えてタブローカルな絞り込み条件（`hiddenStatuses`、`ownerActiveChannels`）もリセットするが、`selectedOwner`（担当者選択）は対象外（2026-07-27.7〜。「条件」と「閲覧対象の選択」は別物という整理。詳細は3章）。
 
 ### タブごとの役割分離の設計方針（2026-07-27.2〜）
 
