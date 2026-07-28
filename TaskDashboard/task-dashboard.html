@@ -1,10 +1,10 @@
 <!--
   @tool      DD-MEP タスク管理ダッシュボード
-  @version   v2026-07-27.11
+  @version   v2026-07-27.12
   @changelog
+    v2026-07-27.12 - 担当者別タブの完了カードの並び順を、期限昇順（sortByDeadline流用）から完了日降順（sortByCompletedDate、最近完了したものが先頭）に変更
     v2026-07-27.11 - 設定タブに「⑤編集リンク設定」を追加。読み込んだリストごとにサイトURL・リストGUIDを入力するフォームを設け、Setting.jsonの手編集なしでeditLinkConfigを設定できるように
     v2026-07-27.10 - 編集リンク設定（EDIT_LINK_CONFIG）をソースコード定数からsettings.editLinkConfigに移行し、Setting.json経由で設定可能に。編集リンクのPageTypeを6（EditForm）から4（DispForm）に変更し、保存ボタンなしで即時保存されるようにした
-    v2026-07-27.9 - フィルタ行の高さ不揃いを修正（input/select/summaryを34pxに統一）。一覧・チャネル別タブのテーブル高さを固定pxから画面残り高さに応じた動的max-heightに変更
 -->
 <!DOCTYPE html>
 <html lang="ja">
@@ -1882,7 +1882,7 @@ function renderOwnerBoard(){
 
   html += `<details class="done-details"><summary>完了（${doneItems.length}件）</summary>`;
   html += doneItems.length
-    ? `<div class="board-cards">${[...doneItems].sort(sortByDeadline).map(renderTaskCard).join('')}</div>`
+    ? `<div class="board-cards">${[...doneItems].sort(sortByCompletedDate).map(renderTaskCard).join('')}</div>`
     : '<div class="empty">完了タスクはありません</div>';
   html += '</details>';
 
@@ -1893,6 +1893,16 @@ function sortByDeadline(a, b){
   const da = a.targetDate ? new Date(a.targetDate) : null;
   const db = b.targetDate ? new Date(b.targetDate) : null;
   if(da && db) return da - db;
+  if(da) return -1;
+  if(db) return 1;
+  return new Date(b.date || 0) - new Date(a.date || 0);
+}
+
+// 完了日（completedDate）の降順（最近完了したものが先頭）。未入力は投稿日の降順で末尾に回す
+function sortByCompletedDate(a, b){
+  const da = a.completedDate ? new Date(a.completedDate) : null;
+  const db = b.completedDate ? new Date(b.completedDate) : null;
+  if(da && db) return db - da;
   if(da) return -1;
   if(db) return 1;
   return new Date(b.date || 0) - new Date(a.date || 0);

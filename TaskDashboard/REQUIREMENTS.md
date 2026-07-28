@@ -162,7 +162,8 @@
   - 未完了カードは期限（`targetDate`）昇順→期限なしは投稿日降順でソート、期限があれば赤字表示
   - タイトル前に編集リンク（鉛筆アイコン）を表示（一覧タブと同じ`renderEditLink`/`getEditUrl`を共用）
   - メタ情報（チャネル／期限or完了日／投稿日）はCSS gridで列位置を固定し、カードごとに揃うようにしている（チャネル名の長さや期限の有無に関わらずズレない）
-  - **完了済みカードは「期限」の代わりに「完了日」（`completedDate`）を表示**（2026-07-27.8〜）。期限を過ぎてからの完了（`completedDate > targetDate`）だけ赤字にし、期限内での完了・期限がそもそもなかった完了は通常色。`completedDate`が未入力のデータは何も表示しない（未完了カードの`targetDate`表示ロジックとは`renderTaskCard`内で分岐、`sortByDeadline`によるソート対象は従来どおり`targetDate`のまま変更していない）
+  - **完了済みカードは「期限」の代わりに「完了日」（`completedDate`）を表示**（2026-07-27.8〜）。期限を過ぎてからの完了（`completedDate > targetDate`）だけ赤字にし、期限内での完了・期限がそもそもなかった完了は通常色。`completedDate`が未入力のデータは何も表示しない（未完了カードの`targetDate`表示ロジックとは`renderTaskCard`内で分岐）
+  - **完了済みカードの並び順は完了日（`completedDate`）の降順**（最近完了したものが先頭、`sortByCompletedDate`。2026-07-27.12〜。それ以前は未完了カードと同じ`sortByDeadline`（期限昇順）を流用しており、完了済みなのに期限順に並ぶのは意味が薄かった）。`completedDate`未入力のカードは投稿日（`date`）降順で末尾に回す。未完了カードのソート基準（`sortByDeadline`、期限昇順→期限なしは投稿日降順）は変更していない
 - ステータス表示のON/OFFチップ（`hiddenStatuses`）で、特定ステータスのセクションを個別に非表示にできる
   - チップ自体の選択肢（`renderOwnerStatusToggle`）は`ownerScopedItems()`（担当者・タブ内完結のチャネル絞り込みを反映、一覧タブの`activeStatuses`は反映しない）を基準に`renderAll()`のたびに再構築される。対象外になったステータスのチップは表示されない
 
