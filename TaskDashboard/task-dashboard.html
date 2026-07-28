@@ -1,10 +1,10 @@
 <!--
   @tool      DD-MEP タスク管理ダッシュボード
-  @version   v2026-07-27.7
+  @version   v2026-07-27.8
   @changelog
+    v2026-07-27.8 - 担当者別タブの完了済みタスクカードに、期限の代わりに完了日（completedDate）を表示。期限を過ぎての完了だけ赤字、期限内・期限なしの完了は通常色に
     v2026-07-27.7 - 条件クリアがselectedOwner（担当者選択）まで解除していたのを撤回。「条件」と「閲覧対象の選択」は別物として、担当者選択は維持したままタブローカルな絞り込み条件だけをクリアするよう修正
     v2026-07-27.6 - 条件クリアが担当者別タブの担当者選択・タブローカルなチャネル/ステータス状態を戻していなかった不具合を修正。担当者別タブのチャネルフィルタとステータスチップの間隔が詰まっていたのを修正
-    v2026-07-27.5 - 担当者別タブのチャネル名クリックを「1件に絞り込む」動作に統一、初期チャネルフィルタ設定を一覧・担当者別タブ共通に、チャネルフィルタパネルをパネル外クリックで閉じるように修正
 -->
 <!DOCTYPE html>
 <html lang="ja">
@@ -1845,12 +1845,21 @@ function renderTaskCard(i){
   const link = i.url
     ? `<a href="${escapeHtml(i.url)}" target="_blank" rel="noopener">${escapeHtml(i.title || '')}</a>`
     : escapeHtml(i.title || '');
+  // 完了済みタスクは期限の代わりに完了日を表示し、期限超過での完了だけ赤字にする
+  // （期限内・期限なしでの完了は通常色。未完了タスクは従来どおり期限を表示）
+  const isDone = RESOLVED_STATUSES.includes(i.status || '');
+  const dateMeta = (isDone && i.completedDate)
+    ? (() => {
+        const isLate = i.targetDate && new Date(i.completedDate) > new Date(i.targetDate);
+        return `<span class="meta-deadline${isLate ? ' deadline' : ''}">完了: ${formatDate(i.completedDate)}</span>`;
+      })()
+    : `<span class="meta-deadline${!isDone && i.targetDate ? ' deadline' : ''}">${!isDone && i.targetDate ? `期限: ${formatDate(i.targetDate)}` : ''}</span>`;
   return `
     <div class="task-card">
       <div class="task-card-title">${renderEditLink(i)}${link}</div>
       <div class="task-card-meta">
         <span class="meta-channel${i.channel ? ' channel-link' : ''}"${i.channel ? ` data-channel="${escapeHtml(i.channel)}" data-status="${escapeHtml(i.status || '(未設定)')}"` : ''}>${escapeHtml(i.channel || '')}</span>
-        <span class="meta-deadline${i.targetDate ? ' deadline' : ''}">${i.targetDate ? `期限: ${formatDate(i.targetDate)}` : ''}</span>
+        ${dateMeta}
         <span class="meta-date">投稿: ${formatDate(i.date)}</span>
       </div>
     </div>`;
