@@ -1,10 +1,10 @@
 <!--
   @tool      DD-MEP タスク管理ダッシュボード
-  @version   v2026-07-27.8
+  @version   v2026-07-27.9
   @changelog
+    v2026-07-27.9 - フィルタ行の高さ不揃いを修正（input/select/summaryを34pxに統一）。一覧・チャネル別タブのテーブル高さを固定pxから画面残り高さに応じた動的max-heightに変更
     v2026-07-27.8 - 担当者別タブの完了済みタスクカードに、期限の代わりに完了日（completedDate）を表示。期限を過ぎての完了だけ赤字、期限内・期限なしの完了は通常色に
     v2026-07-27.7 - 条件クリアがselectedOwner（担当者選択）まで解除していたのを撤回。「条件」と「閲覧対象の選択」は別物として、担当者選択は維持したままタブローカルな絞り込み条件だけをクリアするよう修正
-    v2026-07-27.6 - 条件クリアが担当者別タブの担当者選択・タブローカルなチャネル/ステータス状態を戻していなかった不具合を修正。担当者別タブのチャネルフィルタとステータスチップの間隔が詰まっていたのを修正
 -->
 <!DOCTYPE html>
 <html lang="ja">
@@ -23,6 +23,7 @@
     --page-pad:12px;
   }
   *{box-sizing:border-box;}
+  input, select, textarea, button{ font-family:inherit; }
   body{
     margin:0;
     font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Hiragino Sans","Yu Gothic",sans-serif;
@@ -314,11 +315,20 @@
   }
   .filters select, .filters input[type=text], .filters input[type=date]{
     flex:1 1 120px;
+    height:34px;
+    -webkit-appearance:none;
+    appearance:none;
     padding:6px 8px;
     border:1px solid var(--border);
     border-radius:6px;
     font-size:0.85rem;
     background:#fff;
+  }
+  .filters select{
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%236b7280'/%3E%3C/svg%3E");
+    background-repeat:no-repeat;
+    background-position:right 10px center;
+    padding-right:26px;
   }
   .filters .reset-btn{
     flex:0 0 auto;
@@ -336,6 +346,10 @@
     margin-bottom:10px;
   }
   .channel-filter-details summary{
+    height:34px;
+    box-sizing:border-box;
+    display:flex;
+    align-items:center;
     padding:6px 8px;
     border:1px solid var(--border);
     border-radius:6px;
@@ -1251,8 +1265,10 @@ function setupTabs(){
         refreshStatusGroupSettingsOrder();
         renderStatusGroupSettings();
       }
+      adjustTableWrapHeights();
     });
   });
+  document.querySelector('.role-panel-details').addEventListener('toggle', adjustTableWrapHeights);
 }
 
 // activeRoleTagsが指す人物が1人だけに定まる場合、その名前を返す（役割の種類は問わない）
@@ -1425,7 +1441,21 @@ function renderAll(){
   renderOwnerStatusToggle();
   renderOwnerBoard();
   updateFilterStatus();
+  adjustTableWrapHeights();
 }
+
+// 一覧タブ・チャネル別タブのメインテーブルを、固定px値ではなく実際の画面残り高さに合わせて伸縮させる
+// （役割パネルの折りたたみ表示など、上に積まれる内容の量によってテーブルの開始位置が変わるため、
+// タブ切替・再描画・ウィンドウリサイズ・役割パネルの開閉のたびに再計算する）
+function adjustTableWrapHeights(){
+  const bottomPad = 16;
+  document.querySelectorAll('.view.active .table-wrap:not(.role-panel-wrap)').forEach(wrap => {
+    const top = wrap.getBoundingClientRect().top;
+    const available = window.innerHeight - top - bottomPad;
+    wrap.style.maxHeight = Math.max(available, 160) + 'px';
+  });
+}
+window.addEventListener('resize', adjustTableWrapHeights);
 
 // タブに関わらずどこからでも絞り込み状況を確認・解除できるよう、タブ横に表示を出す
 function hasActiveFilters(){
