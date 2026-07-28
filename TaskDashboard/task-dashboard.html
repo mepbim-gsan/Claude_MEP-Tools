@@ -1,10 +1,10 @@
 <!--
   @tool      DD-MEP タスク管理ダッシュボード
-  @version   v2026-07-27.9
+  @version   v2026-07-27.10
   @changelog
+    v2026-07-27.10 - 編集リンク設定（EDIT_LINK_CONFIG）をソースコード定数からsettings.editLinkConfigに移行し、Setting.json経由で設定可能に。編集リンクのPageTypeを6（EditForm）から4（DispForm）に変更し、保存ボタンなしで即時保存されるようにした
     v2026-07-27.9 - フィルタ行の高さ不揃いを修正（input/select/summaryを34pxに統一）。一覧・チャネル別タブのテーブル高さを固定pxから画面残り高さに応じた動的max-heightに変更
     v2026-07-27.8 - 担当者別タブの完了済みタスクカードに、期限の代わりに完了日（completedDate）を表示。期限を過ぎての完了だけ赤字、期限内・期限なしの完了は通常色に
-    v2026-07-27.7 - 条件クリアがselectedOwner（担当者選択）まで解除していたのを撤回。「条件」と「閲覧対象の選択」は別物として、担当者選択は維持したままタブローカルな絞り込み条件だけをクリアするよう修正
 -->
 <!DOCTYPE html>
 <html lang="ja">
@@ -948,29 +948,23 @@ let statusGroupSettingsOrder = []; // 設定タブ「①ステータスのグル
 // 設定：Setting.json（基本）＋ localStorage（個人上書き）の二層構成
 // statusGroupMap: { "ステータス名": "グループ名" }
 // hiddenPeople: ["表示しない人の名前", ...]
-let settings = { statusGroupMap: {}, hiddenPeople: [], groupOrder: [], defaultStatuses: [], defaultChannels: [], statusColorMap: {} };
-let baseSettingsFromFile = { statusGroupMap: {}, hiddenPeople: [], groupOrder: [], defaultStatuses: [], defaultChannels: [], statusColorMap: {} };
+let settings = { statusGroupMap: {}, hiddenPeople: [], groupOrder: [], defaultStatuses: [], defaultChannels: [], statusColorMap: {}, editLinkConfig: {} };
+let baseSettingsFromFile = { statusGroupMap: {}, hiddenPeople: [], groupOrder: [], defaultStatuses: [], defaultChannels: [], statusColorMap: {}, editLinkConfig: {} };
 const SETTINGS_LS_KEY = 'ddmepDashboardSettingsOverride';
 
 // ここに含まれるステータスは「完了扱い」として担当者ボードで折りたたみ表示します
 const RESOLVED_STATUSES = ['完了'];
 
 // リストごとの編集リンク設定（_sourceList のファイル名部分をキーにする）
-// site: SharePointサイトURL, listId: リストのGUID
-// 未設定のリストは編集リンクを表示しません
-const EDIT_LINK_CONFIG = {
-  ddmep_team: {
-    site: '', // 例: 'https://testcloud.sharepoint.com/sites/mep'
-    listId: '' // 例: 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'
-  }
-  // 別のリストを追加する場合はここに追記
-  // core_members_list: { site: '...', listId: '...' }
-};
-
+// settings.editLinkConfig = { リスト名: { site: SharePointサイトURL, listId: リストのGUID } }
+// Setting.json経由で設定する（settings.defaultChannels等と同じ二層構成）。未設定のリストは編集リンクを表示しない
+// 例: { "editLinkConfig": { "ddmep_team": { "site": "https://testcloud.sharepoint.com/sites/mep", "listId": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" } } }
 function getEditUrl(item){
-  const config = EDIT_LINK_CONFIG[item._sourceList];
+  const config = settings.editLinkConfig[item._sourceList];
   if(!config || !config.site || !config.listId || !item.id) return null;
-  return `${config.site}/_layouts/15/listform.aspx?PageType=6&ListId=${config.listId}&ID=${item.id}`;
+  // PageType=4はDispForm（表示フォーム）。モダンSharePointの表示パネルはフィールドをその場で編集でき、
+  // 保存ボタンを押さなくても変更が即時反映される。PageType=6のEditFormは保存ボタンが必須のため不採用
+  return `${config.site}/_layouts/15/listform.aspx?PageType=4&ListId=${config.listId}&ID=${item.id}`;
 }
 
 const COLOR_PALETTE = [
@@ -1118,7 +1112,8 @@ function normalizeSettings(obj){
     groupOrder: (obj && Array.isArray(obj.groupOrder)) ? obj.groupOrder : [],
     defaultStatuses: (obj && Array.isArray(obj.defaultStatuses)) ? obj.defaultStatuses : [],
     defaultChannels: (obj && Array.isArray(obj.defaultChannels)) ? obj.defaultChannels : [],
-    statusColorMap: (obj && typeof obj.statusColorMap === 'object' && obj.statusColorMap) || {}
+    statusColorMap: (obj && typeof obj.statusColorMap === 'object' && obj.statusColorMap) || {},
+    editLinkConfig: (obj && typeof obj.editLinkConfig === 'object' && obj.editLinkConfig) || {}
   };
 }
 
