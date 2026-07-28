@@ -1,3 +1,11 @@
+<!--
+  @tool      DD-MEP タスク管理ダッシュボード
+  @version   v2026-07-27.12
+  @changelog
+    v2026-07-27.12 - 担当者別タブの完了カードの並び順を、期限昇順（sortByDeadline流用）から完了日降順（sortByCompletedDate、最近完了したものが先頭）に変更
+    v2026-07-27.11 - 設定タブに「⑤編集リンク設定」を追加。読み込んだリストごとにサイトURL・リストGUIDを入力するフォームを設け、Setting.jsonの手編集なしでeditLinkConfigを設定できるように
+    v2026-07-27.10 - 編集リンク設定（EDIT_LINK_CONFIG）をソースコード定数からsettings.editLinkConfigに移行し、Setting.json経由で設定可能に。編集リンクのPageTypeを6（EditForm）から4（DispForm）に変更し、保存ボタンなしで即時保存されるようにした
+-->
 <!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -12,14 +20,16 @@
     --text:#1c2128;
     --sub:#6b7280;
     --accent:#2563eb;
+    --page-pad:12px;
   }
   *{box-sizing:border-box;}
+  input, select, textarea, button{ font-family:inherit; }
   body{
     margin:0;
     font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Hiragino Sans","Yu Gothic",sans-serif;
     background:var(--bg);
     color:var(--text);
-    padding:12px;
+    padding:var(--page-pad);
   }
   h1{
     font-size:1.15rem;
@@ -32,26 +42,68 @@
     padding:14px;
     margin-bottom:12px;
   }
-  .loader{
+  .sticky-header{
+    position:sticky;
+    top:0;
+    margin:calc(var(--page-pad) * -1) calc(var(--page-pad) * -1) 0;
+    padding:var(--page-pad) var(--page-pad) 0;
+    background:var(--bg);
+    z-index:30;
+  }
+  .header-bar{
     display:flex;
-    flex-direction:column;
-    gap:8px;
+    align-items:center;
+    justify-content:space-between;
+    flex-wrap:wrap;
+    gap:6px 12px;
+    margin-bottom:12px;
   }
-  .loader input[type=file]{
-    font-size:0.9rem;
+  .header-bar h1{
+    margin:0;
   }
-  .loader .hint{
+  .loader-compact{
+    display:flex;
+    align-items:center;
+    gap:6px;
+    cursor:help;
+  }
+  .file-icon-btn{
+    font-size:1.25rem;
+    line-height:1;
+    cursor:pointer;
+  }
+  .loaded-file-name{
     font-size:0.78rem;
     color:var(--sub);
+    max-width:320px;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
   }
 
   /* タブ */
+  .tabs-row{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    flex-wrap:wrap;
+    gap:6px 12px;
+    margin-bottom:12px;
+    border-bottom:1px solid var(--border);
+  }
   .tabs{
     display:flex;
     flex-wrap:wrap;
     gap:6px;
-    margin-bottom:12px;
-    border-bottom:1px solid var(--border);
+  }
+  .filter-status{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    font-size:0.75rem;
+    color:var(--accent);
+    font-weight:600;
+    padding-bottom:6px;
   }
   .tab-btn{
     appearance:none;
@@ -261,13 +313,22 @@
     flex-wrap:wrap;
     margin-bottom:10px;
   }
-  .filters select{
+  .filters select, .filters input[type=text], .filters input[type=date]{
     flex:1 1 120px;
+    height:34px;
+    -webkit-appearance:none;
+    appearance:none;
     padding:6px 8px;
     border:1px solid var(--border);
     border-radius:6px;
     font-size:0.85rem;
     background:#fff;
+  }
+  .filters select{
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%236b7280'/%3E%3C/svg%3E");
+    background-repeat:no-repeat;
+    background-position:right 10px center;
+    padding-right:26px;
   }
   .filters .reset-btn{
     flex:0 0 auto;
@@ -279,6 +340,97 @@
     color:var(--sub);
     cursor:pointer;
   }
+  .channel-filter-details{
+    flex:1 1 160px;
+    position:relative;
+    margin-bottom:10px;
+  }
+  .channel-filter-details summary{
+    height:34px;
+    box-sizing:border-box;
+    display:flex;
+    align-items:center;
+    padding:6px 8px;
+    border:1px solid var(--border);
+    border-radius:6px;
+    font-size:0.85rem;
+    background:#fff;
+    cursor:pointer;
+    list-style:none;
+  }
+  .channel-filter-details summary::-webkit-details-marker{ display:none; }
+  .channel-filter-panel{
+    position:absolute;
+    z-index:20;
+    top:calc(100% + 4px);
+    left:0;
+    min-width:260px;
+    max-height:320px;
+    overflow:auto;
+    background:#fff;
+    border:1px solid var(--border);
+    border-radius:8px;
+    padding:10px;
+    box-shadow:0 4px 12px rgba(0,0,0,0.14);
+  }
+  .channel-filter-group-title{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:8px;
+    font-size:0.75rem;
+    font-weight:600;
+    color:var(--sub);
+    margin:8px 0 4px;
+  }
+  .channel-filter-group-title:first-child{ margin-top:0; }
+  .channel-filter-group-actions button{
+    border:none;
+    background:none;
+    color:var(--accent);
+    font-size:0.72rem;
+    cursor:pointer;
+    padding:0 4px;
+  }
+  .channel-filter-list{
+    display:flex;
+    flex-direction:column;
+    gap:4px;
+  }
+  .channel-filter-list label{
+    display:flex;
+    align-items:center;
+    gap:6px;
+    font-size:0.82rem;
+    cursor:pointer;
+  }
+  .date-filter{
+    align-items:center;
+  }
+  .date-filter select{
+    flex:0 1 110px;
+  }
+  .date-filter input[type=date]{
+    flex:1 1 130px;
+  }
+  .date-filter-sep{
+    color:var(--sub);
+    font-size:0.8rem;
+  }
+  .status-color-input{
+    -webkit-appearance:none;
+    appearance:none;
+    width:20px;
+    height:20px;
+    flex:0 0 auto;
+    border:1px solid var(--border);
+    border-radius:5px;
+    padding:0;
+    cursor:pointer;
+    background:none;
+  }
+  .status-color-input::-webkit-color-swatch-wrapper{ padding:0; }
+  .status-color-input::-webkit-color-swatch{ border:none; border-radius:4px; }
 
   table{
     width:100%;
@@ -305,10 +457,19 @@
     color:var(--accent);
     text-decoration:none;
   }
+  .channel-link{
+    cursor:pointer;
+    border-radius:4px;
+  }
+  .channel-link:hover{
+    color:var(--accent);
+    text-decoration:underline;
+  }
   .edit-link{
     text-decoration:none;
     font-size:0.9rem;
     opacity:0.7;
+    margin-right:4px;
   }
   .edit-link:hover{ opacity:1; }
   .badge{
@@ -322,6 +483,9 @@
   .table-wrap{
     max-height:440px;
     overflow:auto;
+  }
+  .table-wrap.role-panel-wrap{
+    max-height:360px;
   }
   .empty{
     color:var(--sub);
@@ -424,12 +588,25 @@
     font-weight:600;
   }
   .task-card-meta{
-    display:flex;
-    flex-wrap:wrap;
-    gap:10px;
+    display:grid;
+    grid-template-columns:minmax(70px,1fr) 108px 96px;
+    align-items:center;
+    gap:2px 10px;
     font-size:0.72rem;
     color:var(--sub);
     margin-top:4px;
+  }
+  .meta-channel{
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+  }
+  .meta-deadline{
+    white-space:nowrap;
+  }
+  .meta-date{
+    white-space:nowrap;
+    text-align:right;
   }
   .task-card-meta .deadline{
     color:#b91c1c;
@@ -444,6 +621,15 @@
     font-weight:600;
     color:var(--sub);
     padding:6px 0;
+  }
+  .role-panel-summary{
+    cursor:pointer;
+    font-size:0.9rem;
+    font-weight:600;
+    color:var(--text);
+  }
+  .role-panel-details[open] .role-panel-summary{
+    margin-bottom:10px;
   }
   .done-details .task-card{
     border-left-color:#9ca3af;
@@ -548,6 +734,31 @@
     font-size:0.8rem;
     background:#fff;
   }
+  .edit-link-config-row{
+    display:flex;
+    flex-wrap:wrap;
+    align-items:center;
+    gap:8px;
+    padding:8px 0;
+    border-bottom:1px solid var(--border);
+    font-size:0.82rem;
+  }
+  .edit-link-config-row:last-child{ border-bottom:none; }
+  .edit-link-config-row .list-name{
+    flex:0 0 140px;
+    font-weight:600;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+  }
+  .edit-link-config-row input{
+    flex:1 1 200px;
+    padding:5px 6px;
+    border:1px solid var(--border);
+    border-radius:6px;
+    font-size:0.8rem;
+    background:#fff;
+  }
   .hidden-people-list{
     display:flex;
     flex-wrap:wrap;
@@ -566,26 +777,57 @@
   .hidden-people-list input{
     margin:0;
   }
+
+  /* スマートフォン対応 */
+  @media(max-width:800px){
+    :root{ --page-pad:8px; }
+    h1{ font-size:1.05rem; }
+    .loaded-file-name{ max-width:140px; font-size:0.72rem; }
+    .tab-btn{ padding:7px 9px; font-size:0.8rem; }
+    .summary .stat{ flex:1 1 72px; padding:6px 8px; }
+    .summary .stat .num{ font-size:1.1rem; }
+    .filters select, .filters input[type=text], .filters input[type=date]{ flex:1 1 100%; }
+    .channel-filter-details{ flex:1 1 100%; }
+    .channel-filter-panel{ left:0; right:0; min-width:0; }
+    .date-filter select{ flex:1 1 100%; }
+    table{ font-size:0.75rem; }
+    th,td{ padding:5px 4px; }
+    .table-wrap{ max-height:60vh; }
+    .table-wrap.role-panel-wrap{ max-height:200px; }
+    .role-table{ font-size:0.72rem; }
+    .role-table th:not(:first-child), .role-table td:not(:first-child){ width:52px; }
+    .bar-row .bar-label{ flex-basis:64px; }
+    .task-card-meta{ grid-template-columns:minmax(56px,1fr) 92px 80px; font-size:0.68rem; }
+  }
 </style>
 </head>
 <body>
 
-<h1>DD-MEP タスク管理ダッシュボード</h1>
+<div class="sticky-header">
+  <div class="header-bar">
+    <h1>DD-MEP タスク管理ダッシュボード</h1>
+    <div class="loader-compact" title="複数リストを同時選択すると統合表示できます。本番運用時はSharePointドキュメントライブラリから自動取得する方式に切り替え予定です。">
+      <label for="fileInput" class="file-icon-btn" aria-label="JSONファイルを読み込み">📂</label>
+      <input type="file" id="fileInput" accept=".json" multiple hidden>
+      <span id="loadedFileName" class="loaded-file-name"></span>
+    </div>
+  </div>
 
-<div class="card loader">
-  <label for="fileInput"><strong>JSONファイルを読み込み</strong>（複数リストを同時選択すると統合表示できます）</label>
-  <input type="file" id="fileInput" accept=".json" multiple>
-  <div class="hint">本番運用時は SharePoint ドキュメントライブラリから自動取得する方式に切り替え予定です。</div>
+  <div class="tabs-row" id="tabsBar" style="display:none;">
+    <div class="tabs">
+      <button class="tab-btn active" data-view="viewList">一覧</button>
+      <button class="tab-btn" data-view="viewGroup">チャネル別</button>
+      <button class="tab-btn" data-view="viewOwner">担当者別</button>
+      <button class="tab-btn" data-view="viewSettings">設定</button>
+    </div>
+    <div class="filter-status" id="filterStatus" style="display:none;">
+      <span class="filter-status-label">絞り込み中</span>
+      <button class="reset-btn" id="resetFilters">条件クリア</button>
+    </div>
+  </div>
 </div>
 
 <div id="dashboard" style="display:none;">
-
-  <div class="tabs">
-    <button class="tab-btn active" data-view="viewList">一覧</button>
-    <button class="tab-btn" data-view="viewGroup">チャネル別</button>
-    <button class="tab-btn" data-view="viewOwner">担当者別</button>
-    <button class="tab-btn" data-view="viewSettings">設定</button>
-  </div>
 
   <!-- 一覧タブ -->
   <div class="view active" id="viewList">
@@ -596,9 +838,10 @@
     </div>
     <div class="card summary" id="summaryCards"></div>
 
-    <div class="card">
+    <details class="card role-panel-details">
+      <summary class="role-panel-summary">役割で絞り込み（担当者・関係者・投稿者）</summary>
       <p class="view-hint">名前をタップすると担当者・関係者・投稿者をまとめて絞り込みます。各件数バッジは個別にON/OFFできます。</p>
-      <div class="table-wrap" style="max-height:360px;">
+      <div class="table-wrap role-panel-wrap">
         <table class="role-table">
           <thead>
             <tr><th>氏名</th><th>担当</th><th>関係</th><th>投稿</th></tr>
@@ -606,13 +849,26 @@
           <tbody id="rolePanelBody"></tbody>
         </table>
       </div>
-    </div>
+    </details>
 
     <div class="card">
       <div class="filters">
-        <select id="channelFilter"><option value="">チャネル：すべて</option></select>
+        <input type="text" id="textFilter" placeholder="タイトルで検索">
+        <details class="channel-filter-details" id="channelFilterDetails">
+          <summary id="channelFilterSummary">チャネル：すべて</summary>
+          <div class="channel-filter-panel" id="channelFilterPanel"></div>
+        </details>
         <select id="listSourceFilter"><option value="">リスト：すべて</option></select>
-        <button class="reset-btn" id="resetFilters">条件クリア</button>
+      </div>
+      <div class="filters date-filter">
+        <select id="dateFilterField">
+          <option value="date">投稿日</option>
+          <option value="modified">更新日</option>
+          <option value="targetDate">期限</option>
+        </select>
+        <input type="date" id="dateFilterFrom">
+        <span class="date-filter-sep">〜</span>
+        <input type="date" id="dateFilterTo">
       </div>
       <p class="view-hint">ステータスは上のサマリーカードをクリックして絞り込みます（複数選択可）。</p>
       <div class="table-wrap">
@@ -649,6 +905,10 @@
     <div class="card">
       <p class="view-hint">担当者を選ぶと、その人の未完了タスクを優先表示します。完了タスクは折りたたみ表示です。</p>
       <select id="ownerSelect"><option value="">担当者を選択してください</option></select>
+      <details class="channel-filter-details" id="ownerChannelFilterDetails">
+        <summary id="ownerChannelFilterSummary">チャネル：すべて</summary>
+        <div class="channel-filter-panel" id="ownerChannelFilterPanel"></div>
+      </details>
       <div class="status-toggle" id="statusToggle"></div>
     </div>
     <div class="card" id="ownerBoardDetail"></div>
@@ -686,6 +946,18 @@
       <p class="view-hint">一覧タブを開いたときに、最初からONにしておくステータス（サマリーカード）を選びます。</p>
       <div class="hidden-people-list" id="defaultStatusSetting"></div>
     </div>
+
+    <div class="card">
+      <h3 class="settings-section-title">④ 初期チャネルフィルタ（一覧・担当者別共通）</h3>
+      <p class="view-hint">一覧タブを開いたとき、および担当者別タブで担当者を選んだときに、最初からONにしておくチャネルを選びます（Tで始まる＝タスクチャネル／それ以外で分類）。</p>
+      <div class="channel-filter-list" id="defaultChannelSetting"></div>
+    </div>
+
+    <div class="card">
+      <h3 class="settings-section-title">⑤ 編集リンク設定</h3>
+      <p class="view-hint">読み込んだリストごとに、SharePointサイトURLとリストGUIDを入力すると、一覧・担当者別タブのタイトル前に編集リンク（鉛筆アイコン）が表示されます。空欄のリストはリンクを表示しません。</p>
+      <div id="editLinkConfigSetting"></div>
+    </div>
   </div>
 
 </div>
@@ -696,37 +968,34 @@
 let rawItems = [];
 let sortState = { key: 'date', dir: 'desc' };
 let activeStatuses = new Set();
+let activeChannels = new Set();
 let activeRoleTags = new Set(); // 例: "owner:氏名", "member:氏名", "author:氏名"
 let selectedOwner = null;
 let summaryViewMode = 'group'; // 'group' または 'status'
 let hiddenStatuses = new Set();
+let ownerActiveChannels = new Set(); // 担当者別タブ内だけで完結するチャネル複数選択絞り込み（一覧タブのactiveChannelsとは独立、初期値はdefaultOwnerChannels()）
+let statusGroupSettingsOrder = []; // 設定タブ「①ステータスのグループ化」の表示順。開いた時だけ並び替え、編集中は維持する
 
 // 設定：Setting.json（基本）＋ localStorage（個人上書き）の二層構成
 // statusGroupMap: { "ステータス名": "グループ名" }
 // hiddenPeople: ["表示しない人の名前", ...]
-let settings = { statusGroupMap: {}, hiddenPeople: [], groupOrder: [], defaultStatuses: [] };
-let baseSettingsFromFile = { statusGroupMap: {}, hiddenPeople: [], groupOrder: [], defaultStatuses: [] };
+let settings = { statusGroupMap: {}, hiddenPeople: [], groupOrder: [], defaultStatuses: [], defaultChannels: [], statusColorMap: {}, editLinkConfig: {} };
+let baseSettingsFromFile = { statusGroupMap: {}, hiddenPeople: [], groupOrder: [], defaultStatuses: [], defaultChannels: [], statusColorMap: {}, editLinkConfig: {} };
 const SETTINGS_LS_KEY = 'ddmepDashboardSettingsOverride';
 
 // ここに含まれるステータスは「完了扱い」として担当者ボードで折りたたみ表示します
 const RESOLVED_STATUSES = ['完了'];
 
 // リストごとの編集リンク設定（_sourceList のファイル名部分をキーにする）
-// site: SharePointサイトURL, listId: リストのGUID
-// 未設定のリストは編集リンクを表示しません
-const EDIT_LINK_CONFIG = {
-  ddmep_team: {
-    site: '', // 例: 'https://testcloud.sharepoint.com/sites/mep'
-    listId: '' // 例: 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'
-  }
-  // 別のリストを追加する場合はここに追記
-  // core_members_list: { site: '...', listId: '...' }
-};
-
+// settings.editLinkConfig = { リスト名: { site: SharePointサイトURL, listId: リストのGUID } }
+// Setting.json経由で設定する（settings.defaultChannels等と同じ二層構成）。未設定のリストは編集リンクを表示しない
+// 例: { "editLinkConfig": { "ddmep_team": { "site": "https://testcloud.sharepoint.com/sites/mep", "listId": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" } } }
 function getEditUrl(item){
-  const config = EDIT_LINK_CONFIG[item._sourceList];
+  const config = settings.editLinkConfig[item._sourceList];
   if(!config || !config.site || !config.listId || !item.id) return null;
-  return `${config.site}/_layouts/15/listform.aspx?PageType=6&ListId=${config.listId}&ID=${item.id}`;
+  // PageType=4はDispForm（表示フォーム）。モダンSharePointの表示パネルはフィールドをその場で編集でき、
+  // 保存ボタンを押さなくても変更が即時反映される。PageType=6のEditFormは保存ボタンが必須のため不採用
+  return `${config.site}/_layouts/15/listform.aspx?PageType=4&ListId=${config.listId}&ID=${item.id}`;
 }
 
 const COLOR_PALETTE = [
@@ -756,18 +1025,23 @@ function getMemberNames(item){
   return rawMemberNames(item).filter(n => !isHiddenPerson(n) && n !== item.owner);
 }
 
-const statusColorMap = {};
+const autoColorCache = {};
 function colorForStatus(status){
-  if(!statusColorMap[status]){
-    const idx = Object.keys(statusColorMap).length % COLOR_PALETTE.length;
-    statusColorMap[status] = COLOR_PALETTE[idx];
+  if(settings.statusColorMap && settings.statusColorMap[status]) return settings.statusColorMap[status];
+  if(!autoColorCache[status]){
+    const idx = Object.keys(autoColorCache).length % COLOR_PALETTE.length;
+    autoColorCache[status] = COLOR_PALETTE[idx];
   }
-  return statusColorMap[status];
+  return autoColorCache[status];
 }
 
 document.getElementById('fileInput').addEventListener('change', function(e){
   const files = [...e.target.files];
   if(!files.length) return;
+
+  const nameEl = document.getElementById('loadedFileName');
+  nameEl.textContent = files.length === 1 ? files[0].name : `${files.length}件のファイル`;
+  nameEl.title = files.map(f => f.name).join(', ');
 
   const settingFiles = files.filter(f => /^setting\.json$/i.test(f.name));
   const dataFiles = files.filter(f => !/^setting\.json$/i.test(f.name));
@@ -792,6 +1066,7 @@ document.getElementById('settingsFileInput').addEventListener('change', function
     if(rawItems.length){
       buildFilters();
       setupOwnerBoardControls();
+      refreshStatusGroupSettingsOrder();
       renderSettingsTab();
       renderAll();
     }
@@ -814,9 +1089,39 @@ document.getElementById('resetLocalSettingsBtn').addEventListener('click', () =>
   if(rawItems.length){
     buildFilters();
     setupOwnerBoardControls();
+    refreshStatusGroupSettingsOrder();
     renderSettingsTab();
     renderAll();
   }
+});
+
+// チャネル名クリックで絞り込み（一覧タブ・担当者別タブそれぞれのタブ内で完結、イベント委譲）
+document.getElementById('tableBody').addEventListener('click', e => {
+  const el = e.target.closest('.channel-link');
+  if(!el) return;
+  activeChannels = new Set([el.dataset.channel]);
+  syncChannelFilterUI();
+  renderAll();
+});
+document.getElementById('ownerBoardDetail').addEventListener('click', e => {
+  const el = e.target.closest('.channel-link');
+  if(!el) return;
+  // 一覧タブ・チャネル別タブと同じ「クリックしたチャネル1件に絞り込む」挙動に統一（一覧タブへは遷移しない）
+  ownerActiveChannels = new Set([el.dataset.channel]);
+  syncOwnerChannelFilterUI();
+  renderOwnerBoard();
+  renderOwnerStatusToggle();
+});
+
+// チャネル絞り込みパネル（一覧タブ・担当者別タブ共通）：パネル外をクリック/タップしたら閉じる
+// 「全選択/全解除」ボタンはクリック時にパネルを再描画（innerHTML差し替え）するため、
+// バブリング時点ではe.targetがDOMから外れてしまう。composedPath()はイベント発生時点の経路を
+// 保持するのでその影響を受けない
+document.addEventListener('click', e => {
+  const path = e.composedPath();
+  document.querySelectorAll('details.channel-filter-details[open]').forEach(details => {
+    if(!path.includes(details)) details.open = false;
+  });
 });
 
 function readSettingsFile(file){
@@ -836,8 +1141,17 @@ function normalizeSettings(obj){
     statusGroupMap: (obj && typeof obj.statusGroupMap === 'object' && obj.statusGroupMap) || {},
     hiddenPeople: (obj && Array.isArray(obj.hiddenPeople)) ? obj.hiddenPeople : [],
     groupOrder: (obj && Array.isArray(obj.groupOrder)) ? obj.groupOrder : [],
-    defaultStatuses: (obj && Array.isArray(obj.defaultStatuses)) ? obj.defaultStatuses : []
+    defaultStatuses: (obj && Array.isArray(obj.defaultStatuses)) ? obj.defaultStatuses : [],
+    defaultChannels: (obj && Array.isArray(obj.defaultChannels)) ? obj.defaultChannels : [],
+    statusColorMap: (obj && typeof obj.statusColorMap === 'object' && obj.statusColorMap) || {},
+    editLinkConfig: (obj && typeof obj.editLinkConfig === 'object' && obj.editLinkConfig) || {}
   };
+}
+
+// チャネル名が「T」で始まるものは「タスクチャネル」、それ以外は「その他」として分類する
+// （運用上の命名規則。REQUIREMENTS.md 7章参照）
+function isTaskChannel(channel){
+  return /^T/.test(channel || '');
 }
 
 // groupOrderを現在存在するグループと同期（削除されたグループを除去、新規グループを末尾に追加）
@@ -861,6 +1175,15 @@ function statusDisplayComparator(countsMap){
     if(countsMap) return (countsMap[b] || 0) - (countsMap[a] || 0);
     return 0;
   };
+}
+
+// 設定タブ「①ステータスのグループ化」を開いたタイミングでだけ、グループ割り当て順に並び替える
+// （編集中に毎回並び替わるとUIが不安定になるため、renderStatusGroupSettings()自体は並び替えを行わない）
+function refreshStatusGroupSettingsOrder(){
+  syncGroupOrder();
+  const counts = countBy(rawItems, i => i.status || '(未設定)');
+  statusGroupSettingsOrder = [...new Set(rawItems.map(i => i.status || '(未設定)'))]
+    .sort(statusDisplayComparator(counts));
 }
 
 function loadLocalOverride(){
@@ -915,23 +1238,45 @@ function readJsonFile(file){
 function init(){
   document.getElementById('emptyState').style.display = 'none';
   document.getElementById('dashboard').style.display = 'block';
+  document.getElementById('tabsBar').style.display = 'flex';
   const existingStatuses = new Set(rawItems.map(i => i.status || '(未設定)'));
   activeStatuses = new Set(settings.defaultStatuses.filter(s => existingStatuses.has(s)));
+  const existingChannels = new Set(rawItems.map(i => i.channel || '(未設定)'));
+  activeChannels = new Set(settings.defaultChannels.filter(c => existingChannels.has(c)));
   activeRoleTags = new Set();
   selectedOwner = null;
+  ownerActiveChannels = defaultOwnerChannels();
   hiddenStatuses = new Set();
   summaryViewMode = 'group';
+  document.getElementById('textFilter').value = '';
+  document.getElementById('dateFilterField').value = 'date';
+  document.getElementById('dateFilterFrom').value = '';
+  document.getElementById('dateFilterTo').value = '';
   buildFilters();
   setupTabs();
   setupSortableHeaders();
   setupOwnerBoardControls();
   setupSummaryModeToggle();
   setupDefaultStatusSetting();
+  setupDefaultChannelSetting();
+  setupEditLinkConfigSetting();
+  refreshStatusGroupSettingsOrder();
   renderSettingsTab();
   document.getElementById('resetFilters').addEventListener('click', () => {
-    ['channelFilter','listSourceFilter'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('listSourceFilter').value = '';
+    document.getElementById('textFilter').value = '';
+    document.getElementById('dateFilterField').value = 'date';
+    document.getElementById('dateFilterFrom').value = '';
+    document.getElementById('dateFilterTo').value = '';
     activeStatuses = new Set();
+    activeChannels = new Set();
     activeRoleTags = new Set();
+    syncChannelFilterUI();
+    // 「誰を見ているか」という選択（selectedOwner）は"条件"ではないためクリアしない。
+    // その人の中で絞り込んでいる条件（タブローカルなチャネル/ステータス絞り込み）だけをリセットする
+    ownerActiveChannels = new Set();
+    syncOwnerChannelFilterUI();
+    hiddenStatuses = new Set();
     renderAll();
   });
   renderAll();
@@ -940,8 +1285,41 @@ function init(){
 /* ---------- タブ切替 ---------- */
 function setupTabs(){
   document.querySelectorAll('.tab-btn').forEach(btn => {
-    btn.addEventListener('click', () => showView(btn.dataset.view));
+    btn.addEventListener('click', () => {
+      showView(btn.dataset.view);
+      if(btn.dataset.view === 'viewOwner') applyImpliedOwnerSelection();
+      if(btn.dataset.view === 'viewSettings'){
+        refreshStatusGroupSettingsOrder();
+        renderStatusGroupSettings();
+      }
+      adjustTableWrapHeights();
+    });
   });
+  document.querySelector('.role-panel-details').addEventListener('toggle', adjustTableWrapHeights);
+}
+
+// activeRoleTagsが指す人物が1人だけに定まる場合、その名前を返す（役割の種類は問わない）
+function singleImpliedPerson(){
+  if(!activeRoleTags.size) return null;
+  const names = new Set([...activeRoleTags].map(tag => tag.slice(tag.indexOf(':') + 1)));
+  if(names.size !== 1) return null;
+  const [name] = names;
+  return name === '(未設定)' ? null : name;
+}
+
+// 一覧タブで1人だけに絞り込まれている状態で担当者別タブを開いたら、その人を自動選択する
+function applyImpliedOwnerSelection(){
+  const name = singleImpliedPerson();
+  if(!name) return;
+  const sel = document.getElementById('ownerSelect');
+  const hasOption = [...sel.options].some(o => o.value === name);
+  if(!hasOption || selectedOwner === name) return;
+  sel.value = name;
+  selectedOwner = name;
+  ownerActiveChannels = defaultOwnerChannels();
+  syncOwnerChannelFilterUI();
+  renderOwnerBoard();
+  renderOwnerStatusToggle();
 }
 function showView(name){
   document.querySelectorAll('.view').forEach(v => v.classList.toggle('active', v.id === name));
@@ -949,14 +1327,24 @@ function showView(name){
 }
 
 /* ---------- フィルタ ---------- */
+// チャネル一覧を「タスクチャネル（Tで始まる）」「その他」の2グループに分けて返す
+function groupedChannels(){
+  const channels = [...new Set(rawItems.map(i => i.channel || '(未設定)'))];
+  return {
+    task: channels.filter(isTaskChannel).sort(),
+    other: channels.filter(c => !isTaskChannel(c)).sort()
+  };
+}
+
 function buildFilters(){
-  const channels = [...new Set(rawItems.map(i => i.channel || '(未設定)'))].sort();
   const listSources = [...new Set(rawItems.map(i => i._sourceList || '(未設定)'))].sort();
 
-  fillSelect('channelFilter', 'チャネル：すべて', channels);
+  renderChannelFilterPanel();
   fillSelect('listSourceFilter', 'リスト：すべて', listSources);
 
-  ['channelFilter','listSourceFilter'].forEach(id =>
+  document.getElementById('listSourceFilter').addEventListener('change', renderAll);
+  document.getElementById('textFilter').addEventListener('input', renderAll);
+  ['dateFilterField','dateFilterFrom','dateFilterTo'].forEach(id =>
     document.getElementById(id).addEventListener('change', renderAll)
   );
 }
@@ -966,16 +1354,91 @@ function fillSelect(id, allLabel, values){
     values.map(v => `<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join('');
 }
 
+// activeChannelsに含まれるチャネルだけのチェックボックスパネルを、グループ見出し付きで描画する
+function channelGroupListHtml(values, checkedSet){
+  return values.map(v => {
+    const checked = checkedSet.has(v) ? ' checked' : '';
+    return `<label><input type="checkbox" data-channel="${escapeHtml(v)}"${checked}>${escapeHtml(v)}</label>`;
+  }).join('') || '<div class="empty">データがありません</div>';
+}
+
+function renderChannelFilterPanel(){
+  const { task, other } = groupedChannels();
+  const container = document.getElementById('channelFilterPanel');
+  container.innerHTML = `
+    <div class="channel-filter-group-title">
+      <span>タスクチャネル（Tで始まる）</span>
+      <span class="channel-filter-group-actions">
+        <button type="button" data-group="task" data-act="all">全選択</button>
+        <button type="button" data-group="task" data-act="none">全解除</button>
+      </span>
+    </div>
+    <div class="channel-filter-list" data-group="task">${channelGroupListHtml(task, activeChannels)}</div>
+    <div class="channel-filter-group-title">
+      <span>その他</span>
+      <span class="channel-filter-group-actions">
+        <button type="button" data-group="other" data-act="all">全選択</button>
+        <button type="button" data-group="other" data-act="none">全解除</button>
+      </span>
+    </div>
+    <div class="channel-filter-list" data-group="other">${channelGroupListHtml(other, activeChannels)}</div>
+  `;
+
+  container.querySelectorAll('input[type=checkbox]').forEach(cb => {
+    cb.addEventListener('change', () => {
+      const c = cb.dataset.channel;
+      if(cb.checked) activeChannels.add(c); else activeChannels.delete(c);
+      syncChannelFilterUI();
+      renderAll();
+    });
+  });
+  container.querySelectorAll('button[data-group]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const values = btn.dataset.group === 'task' ? task : other;
+      if(btn.dataset.act === 'all') values.forEach(v => activeChannels.add(v));
+      else values.forEach(v => activeChannels.delete(v));
+      renderChannelFilterPanel();
+      syncChannelFilterUI();
+      renderAll();
+    });
+  });
+
+  syncChannelFilterSummary();
+}
+
+// activeChannelsの状態をチェックボックスとサマリー表示に反映する（Set変更後の再同期用）
+function syncChannelFilterUI(){
+  document.querySelectorAll('#channelFilterPanel input[type=checkbox]').forEach(cb => {
+    cb.checked = activeChannels.has(cb.dataset.channel);
+  });
+  syncChannelFilterSummary();
+}
+function syncChannelFilterSummary(){
+  const summary = document.getElementById('channelFilterSummary');
+  summary.textContent = activeChannels.size ? `チャネル：${activeChannels.size}件選択中` : 'チャネル：すべて';
+}
+
 function getFiltered(options){
   const exclude = (options && options.exclude) || [];
-  const channel = document.getElementById('channelFilter').value;
   const listSource = document.getElementById('listSourceFilter').value;
+  const text = document.getElementById('textFilter').value.trim().toLowerCase();
+  const dateField = document.getElementById('dateFilterField').value;
+  const dateFrom = document.getElementById('dateFilterFrom').value;
+  const dateTo = document.getElementById('dateFilterTo').value;
   return rawItems.filter(i => {
     const status = i.status || '(未設定)';
     const owner = getOwnerName(i);
     if(!exclude.includes('status') && activeStatuses.size && !activeStatuses.has(status)) return false;
-    if(!exclude.includes('channel') && channel && (i.channel || '(未設定)') !== channel) return false;
+    if(!exclude.includes('channel') && activeChannels.size && !activeChannels.has(i.channel || '(未設定)')) return false;
     if(!exclude.includes('listSource') && listSource && (i._sourceList || '(未設定)') !== listSource) return false;
+    if(text && !(i.title || '').toLowerCase().includes(text)) return false;
+    if(dateFrom || dateTo){
+      const raw = i[dateField];
+      if(!raw) return false;
+      const d = String(raw).slice(0, 10);
+      if(dateFrom && d < dateFrom) return false;
+      if(dateTo && d > dateTo) return false;
+    }
     if(!exclude.includes('roleTags') && activeRoleTags.size){
       const matches = [...activeRoleTags].some(tag => {
         const sep = tag.indexOf(':');
@@ -1002,7 +1465,37 @@ function renderAll(){
   renderTable(items);
   renderRolePanel();
   renderMatrix('groupMatrix', 'channel', 'チャネル', getFiltered({exclude:['channel']}), 'name');
+  renderOwnerStatusToggle();
   renderOwnerBoard();
+  updateFilterStatus();
+  adjustTableWrapHeights();
+}
+
+// 一覧タブ・チャネル別タブのメインテーブルを、固定px値ではなく実際の画面残り高さに合わせて伸縮させる
+// （役割パネルの折りたたみ表示など、上に積まれる内容の量によってテーブルの開始位置が変わるため、
+// タブ切替・再描画・ウィンドウリサイズ・役割パネルの開閉のたびに再計算する）
+function adjustTableWrapHeights(){
+  const bottomPad = 16;
+  document.querySelectorAll('.view.active .table-wrap:not(.role-panel-wrap)').forEach(wrap => {
+    const top = wrap.getBoundingClientRect().top;
+    const available = window.innerHeight - top - bottomPad;
+    wrap.style.maxHeight = Math.max(available, 160) + 'px';
+  });
+}
+window.addEventListener('resize', adjustTableWrapHeights);
+
+// タブに関わらずどこからでも絞り込み状況を確認・解除できるよう、タブ横に表示を出す
+function hasActiveFilters(){
+  return activeStatuses.size > 0
+    || activeRoleTags.size > 0
+    || activeChannels.size > 0
+    || document.getElementById('listSourceFilter').value !== ''
+    || document.getElementById('textFilter').value.trim() !== ''
+    || document.getElementById('dateFilterFrom').value !== ''
+    || document.getElementById('dateFilterTo').value !== '';
+}
+function updateFilterStatus(){
+  document.getElementById('filterStatus').style.display = hasActiveFilters() ? 'flex' : 'none';
 }
 
 function renderRolePanel(){
@@ -1209,7 +1702,7 @@ function renderMatrix(containerId, groupField, groupLabel, items, sortMode){
     statuses.forEach(s => {
       const count = matrix[g][s] || 0;
       html += count > 0
-        ? `<td><button class="matrix-cell" data-field="${groupField}" data-value="${escapeHtml(g)}" data-status="${escapeHtml(s)}">${count}</button></td>`
+        ? `<td><button class="matrix-cell" data-value="${escapeHtml(g)}" data-status="${escapeHtml(s)}">${count}</button></td>`
         : `<td class="matrix-zero">0</td>`;
     });
     html += `<td><strong>${total}</strong></td></tr>`;
@@ -1220,14 +1713,10 @@ function renderMatrix(containerId, groupField, groupLabel, items, sortMode){
 
   container.querySelectorAll('.matrix-cell').forEach(btn => {
     btn.addEventListener('click', () => {
-      const field = btn.dataset.field; // 'owner' or 'channel'
       const value = btn.dataset.value;
       const status = btn.dataset.status;
-      if(field === 'owner'){
-        activeRoleTags = new Set([`owner:${value}`]);
-      }else if(field === 'channel'){
-        document.getElementById('channelFilter').value = value;
-      }
+      activeChannels = new Set([value]);
+      syncChannelFilterUI();
       activeStatuses = new Set([status]);
       renderAll();
       showView('viewList');
@@ -1236,6 +1725,21 @@ function renderMatrix(containerId, groupField, groupLabel, items, sortMode){
 }
 
 /* ---------- 担当者ボード ---------- */
+// 担当者別タブのチャネル絞り込みの初期値：設定タブ「④初期チャネルフィルタ」の値を一覧タブと共通で使う
+function defaultOwnerChannels(){
+  const existingChannels = new Set(rawItems.map(i => i.channel || '(未設定)'));
+  return new Set(settings.defaultChannels.filter(c => existingChannels.has(c)));
+}
+
+// 担当者別タブの対象タスク（選択中の担当者・タブ内完結のチャネル絞り込みを反映。
+// ステータスは一覧タブのactiveStatusesを継承せず、hiddenStatusesチップだけで個別に隠す）
+function ownerScopedItems(){
+  if(!selectedOwner) return [];
+  return getFiltered({exclude:['roleTags','channel','status']})
+    .filter(i => getOwnerName(i) === selectedOwner)
+    .filter(i => !ownerActiveChannels.size || ownerActiveChannels.has(i.channel || '(未設定)'));
+}
+
 function setupOwnerBoardControls(){
   const owners = [...new Set(rawItems.map(i => getOwnerName(i)))];
   const counted = owners.map(o => {
@@ -1249,17 +1753,87 @@ function setupOwnerBoardControls(){
     counted.map(c => `<option value="${escapeHtml(c.owner)}">${escapeHtml(c.owner)}（未完了${c.active}／全${c.total}）</option>`).join('');
   sel.addEventListener('change', () => {
     selectedOwner = sel.value || null;
-    renderOwnerBoard();
+    ownerActiveChannels = defaultOwnerChannels();
+    syncOwnerChannelFilterUI();
+    // 選んだ担当者を一覧タブ側の役割タグにも反映し、タブを跨いでも「誰を見ているか」がズレないようにする
+    activeRoleTags = selectedOwner ? new Set([`owner:${selectedOwner}`]) : new Set();
+    renderAll();
   });
 
+  renderOwnerChannelFilterPanel();
+}
+
+// activeChannelsに含まれるチャネルだけのチェックボックスパネルを、グループ見出し付きで描画する（一覧タブと同じ構造）
+function renderOwnerChannelFilterPanel(){
+  const { task, other } = groupedChannels();
+  const container = document.getElementById('ownerChannelFilterPanel');
+  container.innerHTML = `
+    <div class="channel-filter-group-title">
+      <span>タスクチャネル（Tで始まる）</span>
+      <span class="channel-filter-group-actions">
+        <button type="button" data-group="task" data-act="all">全選択</button>
+        <button type="button" data-group="task" data-act="none">全解除</button>
+      </span>
+    </div>
+    <div class="channel-filter-list" data-group="task">${channelGroupListHtml(task, ownerActiveChannels)}</div>
+    <div class="channel-filter-group-title">
+      <span>その他</span>
+      <span class="channel-filter-group-actions">
+        <button type="button" data-group="other" data-act="all">全選択</button>
+        <button type="button" data-group="other" data-act="none">全解除</button>
+      </span>
+    </div>
+    <div class="channel-filter-list" data-group="other">${channelGroupListHtml(other, ownerActiveChannels)}</div>
+  `;
+
+  container.querySelectorAll('input[type=checkbox]').forEach(cb => {
+    cb.addEventListener('change', () => {
+      const c = cb.dataset.channel;
+      if(cb.checked) ownerActiveChannels.add(c); else ownerActiveChannels.delete(c);
+      syncOwnerChannelFilterUI();
+      renderOwnerBoard();
+      renderOwnerStatusToggle();
+    });
+  });
+  container.querySelectorAll('button[data-group]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const values = btn.dataset.group === 'task' ? task : other;
+      if(btn.dataset.act === 'all') values.forEach(v => ownerActiveChannels.add(v));
+      else values.forEach(v => ownerActiveChannels.delete(v));
+      renderOwnerChannelFilterPanel();
+      syncOwnerChannelFilterUI();
+      renderOwnerBoard();
+      renderOwnerStatusToggle();
+    });
+  });
+
+  syncOwnerChannelFilterSummary();
+}
+
+// ownerActiveChannelsの状態をチェックボックスとサマリー表示に反映する（Set変更後の再同期用）
+function syncOwnerChannelFilterUI(){
+  document.querySelectorAll('#ownerChannelFilterPanel input[type=checkbox]').forEach(cb => {
+    cb.checked = ownerActiveChannels.has(cb.dataset.channel);
+  });
+  syncOwnerChannelFilterSummary();
+}
+function syncOwnerChannelFilterSummary(){
+  const summary = document.getElementById('ownerChannelFilterSummary');
+  summary.textContent = ownerActiveChannels.size ? `チャネル：${ownerActiveChannels.size}件選択中` : 'チャネル：すべて';
+}
+
+// ステータス表示ON/OFFチップ：担当者別タブの対象タスク（ownerScopedItems）を反映して
+// 対象外になったステータスのチップは出さないよう、renderAll()のたびに再構築する
+function renderOwnerStatusToggle(){
   syncGroupOrder();
-  const statusCounts = countBy(rawItems, i => i.status || '(未設定)');
+  const filteredItems = ownerScopedItems();
+  const statusCounts = countBy(filteredItems, i => i.status || '(未設定)');
   const activeStatusList = [...new Set(
-    rawItems.map(i => i.status || '(未設定)').filter(s => !RESOLVED_STATUSES.includes(s))
+    filteredItems.map(i => i.status || '(未設定)').filter(s => !RESOLVED_STATUSES.includes(s))
   )].sort(statusDisplayComparator(statusCounts));
   const toggle = document.getElementById('statusToggle');
   toggle.innerHTML = activeStatusList.map(s => `
-    <button type="button" class="status-chip" data-status="${escapeHtml(s)}">
+    <button type="button" class="status-chip${hiddenStatuses.has(s) ? ' hidden' : ''}" data-status="${escapeHtml(s)}">
       <span class="dot" style="background:${colorForStatus(s)}"></span>${escapeHtml(s)}
     </button>
   `).join('');
@@ -1267,8 +1841,8 @@ function setupOwnerBoardControls(){
     chip.addEventListener('click', () => {
       const s = chip.dataset.status;
       if(hiddenStatuses.has(s)) hiddenStatuses.delete(s); else hiddenStatuses.add(s);
-      chip.classList.toggle('hidden', hiddenStatuses.has(s));
       renderOwnerBoard();
+      renderOwnerStatusToggle();
     });
   });
 }
@@ -1281,7 +1855,7 @@ function renderOwnerBoard(){
     return;
   }
 
-  const items = rawItems.filter(i => getOwnerName(i) === selectedOwner);
+  const items = ownerScopedItems();
   const activeItems = items.filter(i => !RESOLVED_STATUSES.includes(i.status || ''));
   const doneItems = items.filter(i => RESOLVED_STATUSES.includes(i.status || ''));
   syncGroupOrder();
@@ -1308,7 +1882,7 @@ function renderOwnerBoard(){
 
   html += `<details class="done-details"><summary>完了（${doneItems.length}件）</summary>`;
   html += doneItems.length
-    ? `<div class="board-cards">${[...doneItems].sort(sortByDeadline).map(renderTaskCard).join('')}</div>`
+    ? `<div class="board-cards">${[...doneItems].sort(sortByCompletedDate).map(renderTaskCard).join('')}</div>`
     : '<div class="empty">完了タスクはありません</div>';
   html += '</details>';
 
@@ -1324,17 +1898,36 @@ function sortByDeadline(a, b){
   return new Date(b.date || 0) - new Date(a.date || 0);
 }
 
+// 完了日（completedDate）の降順（最近完了したものが先頭）。未入力は投稿日の降順で末尾に回す
+function sortByCompletedDate(a, b){
+  const da = a.completedDate ? new Date(a.completedDate) : null;
+  const db = b.completedDate ? new Date(b.completedDate) : null;
+  if(da && db) return db - da;
+  if(da) return -1;
+  if(db) return 1;
+  return new Date(b.date || 0) - new Date(a.date || 0);
+}
+
 function renderTaskCard(i){
   const link = i.url
     ? `<a href="${escapeHtml(i.url)}" target="_blank" rel="noopener">${escapeHtml(i.title || '')}</a>`
     : escapeHtml(i.title || '');
+  // 完了済みタスクは期限の代わりに完了日を表示し、期限超過での完了だけ赤字にする
+  // （期限内・期限なしでの完了は通常色。未完了タスクは従来どおり期限を表示）
+  const isDone = RESOLVED_STATUSES.includes(i.status || '');
+  const dateMeta = (isDone && i.completedDate)
+    ? (() => {
+        const isLate = i.targetDate && new Date(i.completedDate) > new Date(i.targetDate);
+        return `<span class="meta-deadline${isLate ? ' deadline' : ''}">完了: ${formatDate(i.completedDate)}</span>`;
+      })()
+    : `<span class="meta-deadline${!isDone && i.targetDate ? ' deadline' : ''}">${!isDone && i.targetDate ? `期限: ${formatDate(i.targetDate)}` : ''}</span>`;
   return `
     <div class="task-card">
-      <div class="task-card-title">${link}</div>
+      <div class="task-card-title">${renderEditLink(i)}${link}</div>
       <div class="task-card-meta">
-        <span>${escapeHtml(i.channel || '')}</span>
-        ${i.targetDate ? `<span class="deadline">期限: ${formatDate(i.targetDate)}</span>` : ''}
-        <span>投稿: ${formatDate(i.date)}</span>
+        <span class="meta-channel${i.channel ? ' channel-link' : ''}"${i.channel ? ` data-channel="${escapeHtml(i.channel)}" data-status="${escapeHtml(i.status || '(未設定)')}"` : ''}>${escapeHtml(i.channel || '')}</span>
+        ${dateMeta}
+        <span class="meta-date">投稿: ${formatDate(i.date)}</span>
       </div>
     </div>`;
 }
@@ -1344,6 +1937,8 @@ function renderSettingsTab(){
   renderStatusGroupSettings();
   renderHiddenPeopleSettings();
   renderDefaultStatusSetting();
+  renderDefaultChannelSetting();
+  renderEditLinkConfigSetting();
 }
 
 function renderGroupManagement(){
@@ -1403,7 +1998,12 @@ function renderStatusGroupSettings(){
   renderGroupManagement();
 
   const container = document.getElementById('statusGroupSettings');
-  const statuses = [...new Set(rawItems.map(i => i.status || '(未設定)'))].sort();
+  // 表示順はrefreshStatusGroupSettingsOrder()で決めた並びを維持する（ここでは並び替えない）。
+  // データ側の増減だけ追従：消えたステータスは除外、新規は末尾に追加
+  const existingStatuses = new Set(rawItems.map(i => i.status || '(未設定)'));
+  statusGroupSettingsOrder = statusGroupSettingsOrder.filter(s => existingStatuses.has(s));
+  existingStatuses.forEach(s => { if(!statusGroupSettingsOrder.includes(s)) statusGroupSettingsOrder.push(s); });
+  const statuses = statusGroupSettingsOrder;
   const groupNames = [...new Set(Object.values(settings.statusGroupMap))].sort();
 
   container.innerHTML = statuses.map(s => {
@@ -1413,11 +2013,18 @@ function renderStatusGroupSettings(){
       .concat(['<option value="__new__">＋ 新しいグループ…</option>'])
       .join('');
     return `<div class="status-group-row">
-      <span class="dot" style="background:${colorForStatus(s)}"></span>
+      <input type="color" class="status-color-input" data-status="${escapeHtml(s)}" value="${colorForStatus(s)}" title="${escapeHtml(s)}の色を変更">
       <span class="status-name">${escapeHtml(s)}</span>
       <select data-status="${escapeHtml(s)}">${options}</select>
     </div>`;
   }).join('') || '<div class="empty">データがありません</div>';
+
+  container.querySelectorAll('.status-color-input').forEach(inp => {
+    inp.addEventListener('change', () => {
+      settings.statusColorMap[inp.dataset.status] = inp.value;
+      onSettingsChanged();
+    });
+  });
 
   container.querySelectorAll('select').forEach(sel => {
     sel.addEventListener('change', () => {
@@ -1489,6 +2096,67 @@ function setupDefaultStatusSetting(){
   });
 }
 
+function renderDefaultChannelSetting(){
+  const container = document.getElementById('defaultChannelSetting');
+  const { task, other } = groupedChannels();
+  container.innerHTML = `
+    <div class="channel-filter-group-title"><span>タスクチャネル（Tで始まる）</span></div>
+    ${channelGroupListHtml(task, new Set(settings.defaultChannels))}
+    <div class="channel-filter-group-title"><span>その他</span></div>
+    ${channelGroupListHtml(other, new Set(settings.defaultChannels))}
+  `;
+}
+
+function setupDefaultChannelSetting(){
+  document.getElementById('defaultChannelSetting').addEventListener('change', e => {
+    const cb = e.target.closest('input[type=checkbox]');
+    if(!cb) return;
+    const c = cb.dataset.channel;
+    if(cb.checked){
+      if(!settings.defaultChannels.includes(c)) settings.defaultChannels.push(c);
+    }else{
+      settings.defaultChannels = settings.defaultChannels.filter(v => v !== c);
+    }
+    onSettingsChanged();
+  });
+}
+
+// リストごとの編集リンク設定（settings.editLinkConfig）。読み込んだ_sourceListごとに
+// サイトURL・リストGUIDの入力欄を表示する
+function renderEditLinkConfigSetting(){
+  const container = document.getElementById('editLinkConfigSetting');
+  const lists = [...new Set(rawItems.map(i => i._sourceList).filter(Boolean))].sort();
+  container.innerHTML = lists.map(name => {
+    const config = settings.editLinkConfig[name] || {};
+    return `<div class="edit-link-config-row" data-list="${escapeHtml(name)}">
+      <span class="list-name">${escapeHtml(name)}</span>
+      <input type="text" class="edit-link-site" placeholder="サイトURL（例: https://xxx.sharepoint.com/sites/mep）" value="${escapeHtml(config.site || '')}">
+      <input type="text" class="edit-link-listid" placeholder="リストGUID" value="${escapeHtml(config.listId || '')}">
+    </div>`;
+  }).join('') || '<div class="empty">データがありません</div>';
+}
+
+function setupEditLinkConfigSetting(){
+  // onSettingsChanged()（renderSettingsTab経由でこの欄自身も再描画）は使わない。
+  // 同じ行のサイトURL欄→リストGUID欄と続けて入力する際、片方のchangeで行のinput要素を
+  // 作り直すと、もう片方へ移った直後の入力先を失ってしまう（フォーカスが外れる）ため、
+  // 保存とeditLinkConfigを参照する描画（一覧・担当者別タブの編集リンク表示）だけを行う
+  document.getElementById('editLinkConfigSetting').addEventListener('change', e => {
+    const row = e.target.closest('.edit-link-config-row');
+    if(!row) return;
+    const name = row.dataset.list;
+    const site = row.querySelector('.edit-link-site').value.trim();
+    const listId = row.querySelector('.edit-link-listid').value.trim();
+    if(site || listId){
+      settings.editLinkConfig[name] = { site, listId };
+    }else{
+      delete settings.editLinkConfig[name];
+    }
+    saveLocalOverride();
+    renderAll();
+  });
+}
+
 /* ---------- 一覧テーブル（ソート可） ---------- */
 function setupSortableHeaders(){
   document.querySelectorAll('th.sortable').forEach(th => {
@@ -1520,7 +2188,7 @@ function renderTable(items){
       <td>${escapeHtml(getOwnerName(i))}</td>
       <td>${escapeHtml(getMemberNames(i).join('、'))}</td>
       <td>${escapeHtml(getAuthorName(i))}</td>
-      <td>${escapeHtml(i.channel || '')}</td>
+      <td>${i.channel ? `<span class="channel-link" data-channel="${escapeHtml(i.channel)}">${escapeHtml(i.channel)}</span>` : ''}</td>
       <td>${formatDate(i.date)}</td>
       <td>${formatDate(i.modified)}</td>
     </tr>
