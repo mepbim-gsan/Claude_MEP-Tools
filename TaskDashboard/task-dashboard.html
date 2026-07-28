@@ -1,10 +1,10 @@
 <!--
   @tool      DD-MEP タスク管理ダッシュボード
-  @version   v2026-07-27.10
+  @version   v2026-07-27.11
   @changelog
+    v2026-07-27.11 - 設定タブに「⑤編集リンク設定」を追加。読み込んだリストごとにサイトURL・リストGUIDを入力するフォームを設け、Setting.jsonの手編集なしでeditLinkConfigを設定できるように
     v2026-07-27.10 - 編集リンク設定（EDIT_LINK_CONFIG）をソースコード定数からsettings.editLinkConfigに移行し、Setting.json経由で設定可能に。編集リンクのPageTypeを6（EditForm）から4（DispForm）に変更し、保存ボタンなしで即時保存されるようにした
     v2026-07-27.9 - フィルタ行の高さ不揃いを修正（input/select/summaryを34pxに統一）。一覧・チャネル別タブのテーブル高さを固定pxから画面残り高さに応じた動的max-heightに変更
-    v2026-07-27.8 - 担当者別タブの完了済みタスクカードに、期限の代わりに完了日（completedDate）を表示。期限を過ぎての完了だけ赤字、期限内・期限なしの完了は通常色に
 -->
 <!DOCTYPE html>
 <html lang="ja">
@@ -734,6 +734,31 @@
     font-size:0.8rem;
     background:#fff;
   }
+  .edit-link-config-row{
+    display:flex;
+    flex-wrap:wrap;
+    align-items:center;
+    gap:8px;
+    padding:8px 0;
+    border-bottom:1px solid var(--border);
+    font-size:0.82rem;
+  }
+  .edit-link-config-row:last-child{ border-bottom:none; }
+  .edit-link-config-row .list-name{
+    flex:0 0 140px;
+    font-weight:600;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+  }
+  .edit-link-config-row input{
+    flex:1 1 200px;
+    padding:5px 6px;
+    border:1px solid var(--border);
+    border-radius:6px;
+    font-size:0.8rem;
+    background:#fff;
+  }
   .hidden-people-list{
     display:flex;
     flex-wrap:wrap;
@@ -926,6 +951,12 @@
       <h3 class="settings-section-title">④ 初期チャネルフィルタ（一覧・担当者別共通）</h3>
       <p class="view-hint">一覧タブを開いたとき、および担当者別タブで担当者を選んだときに、最初からONにしておくチャネルを選びます（Tで始まる＝タスクチャネル／それ以外で分類）。</p>
       <div class="channel-filter-list" id="defaultChannelSetting"></div>
+    </div>
+
+    <div class="card">
+      <h3 class="settings-section-title">⑤ 編集リンク設定</h3>
+      <p class="view-hint">読み込んだリストごとに、SharePointサイトURLとリストGUIDを入力すると、一覧・担当者別タブのタイトル前に編集リンク（鉛筆アイコン）が表示されます。空欄のリストはリンクを表示しません。</p>
+      <div id="editLinkConfigSetting"></div>
     </div>
   </div>
 
@@ -1228,6 +1259,7 @@ function init(){
   setupSummaryModeToggle();
   setupDefaultStatusSetting();
   setupDefaultChannelSetting();
+  setupEditLinkConfigSetting();
   refreshStatusGroupSettingsOrder();
   renderSettingsTab();
   document.getElementById('resetFilters').addEventListener('click', () => {
@@ -1896,6 +1928,7 @@ function renderSettingsTab(){
   renderHiddenPeopleSettings();
   renderDefaultStatusSetting();
   renderDefaultChannelSetting();
+  renderEditLinkConfigSetting();
 }
 
 function renderGroupManagement(){
@@ -2075,6 +2108,42 @@ function setupDefaultChannelSetting(){
       settings.defaultChannels = settings.defaultChannels.filter(v => v !== c);
     }
     onSettingsChanged();
+  });
+}
+
+// リストごとの編集リンク設定（settings.editLinkConfig）。読み込んだ_sourceListごとに
+// サイトURL・リストGUIDの入力欄を表示する
+function renderEditLinkConfigSetting(){
+  const container = document.getElementById('editLinkConfigSetting');
+  const lists = [...new Set(rawItems.map(i => i._sourceList).filter(Boolean))].sort();
+  container.innerHTML = lists.map(name => {
+    const config = settings.editLinkConfig[name] || {};
+    return `<div class="edit-link-config-row" data-list="${escapeHtml(name)}">
+      <span class="list-name">${escapeHtml(name)}</span>
+      <input type="text" class="edit-link-site" placeholder="サイトURL（例: https://xxx.sharepoint.com/sites/mep）" value="${escapeHtml(config.site || '')}">
+      <input type="text" class="edit-link-listid" placeholder="リストGUID" value="${escapeHtml(config.listId || '')}">
+    </div>`;
+  }).join('') || '<div class="empty">データがありません</div>';
+}
+
+function setupEditLinkConfigSetting(){
+  // onSettingsChanged()（renderSettingsTab経由でこの欄自身も再描画）は使わない。
+  // 同じ行のサイトURL欄→リストGUID欄と続けて入力する際、片方のchangeで行のinput要素を
+  // 作り直すと、もう片方へ移った直後の入力先を失ってしまう（フォーカスが外れる）ため、
+  // 保存とeditLinkConfigを参照する描画（一覧・担当者別タブの編集リンク表示）だけを行う
+  document.getElementById('editLinkConfigSetting').addEventListener('change', e => {
+    const row = e.target.closest('.edit-link-config-row');
+    if(!row) return;
+    const name = row.dataset.list;
+    const site = row.querySelector('.edit-link-site').value.trim();
+    const listId = row.querySelector('.edit-link-listid').value.trim();
+    if(site || listId){
+      settings.editLinkConfig[name] = { site, listId };
+    }else{
+      delete settings.editLinkConfig[name];
+    }
+    saveLocalOverride();
+    renderAll();
   });
 }
 
