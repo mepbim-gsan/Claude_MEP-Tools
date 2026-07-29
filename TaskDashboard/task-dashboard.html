@@ -1,10 +1,10 @@
 <!--
   @tool      DD-MEP タスク管理ダッシュボード
-  @version   v2026-07-29
+  @version   v2026-07-29.2
   @changelog
+    v2026-07-29.2 - 概要タブの実機フィードバック6件を修正。①超過/直近期限タスクの個別行タップを、一覧タブへの絞り込み遷移からタスクURLを直接開く方式に変更（残存フィルタで対象が見えない問題を回避）。②スマホでタイトルが長いとレイアウトが横はみ出す不具合を修正（CSS Gridのmin-width:0漏れ）。③KPIカードにグループの構成ステータス名をサブテキストで表示。④「すべて見る」等の一覧タブ遷移前にチャネル/役割/テキスト/期間フィルタを全リセットするよう修正（残存フィルタで対象外の項目が混ざる/消える不具合）。⑤担当者別ワークロードのバーを最大値基準の相対幅から常に100%表示（内訳の割合を見せる）に変更。⑥ワークロード行タップ時に一覧タブ側の共有フィルタ（期間等）も含めて全解除するよう修正（表示件数の不一致を解消）
     v2026-07-29 - 「概要」タブを新規追加（先頭タブ、既定の表示先）。KPIサマリー・超過タスク一覧・直近期限タスク・担当者別ワークロード（積み上げバー）の4要素で構成。設定タブ①にグループ単位の「タスクとして集計する」チェックボックス（groupMeta.countable）を追加し、非集計グループは概要タブの全要素と一覧タブの総件数から除外されるように
     v2026-07-27.12 - 担当者別タブの完了カードの並び順を、期限昇順（sortByDeadline流用）から完了日降順（sortByCompletedDate、最近完了したものが先頭）に変更
-    v2026-07-27.11 - 設定タブに「⑤編集リンク設定」を追加。読み込んだリストごとにサイトURL・リストGUIDを入力するフォームを設け、Setting.jsonの手編集なしでeditLinkConfigを設定できるように
 -->
 <!DOCTYPE html>
 <html lang="ja">
@@ -195,6 +195,14 @@
     color:#b45309;
     margin-top:1px;
   }
+  .stat-sub{
+    font-size:0.64rem;
+    color:var(--sub);
+    margin-top:2px;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+  }
 
   .chart-wrap{ position:relative; }
   .bar-chart-title{
@@ -241,30 +249,17 @@
     height:16px;
     position:relative;
     overflow:hidden;
+    display:flex;
   }
   .bar-row .bar-fill{
     height:100%;
-    border-radius:4px;
     min-width:2px;
+    flex:0 0 auto;
   }
   .bar-row .bar-value{
     flex:0 0 30px;
     font-weight:600;
     font-variant-numeric:tabular-nums;
-  }
-
-  /* 概要タブ：担当者別ワークロード（複数ステータスの積み上げバー）。既存の.bar-row系クラスを拡張して使う */
-  .bar-fill-group{
-    display:flex;
-    height:100%;
-    min-width:2%;
-    border-radius:4px;
-    overflow:hidden;
-  }
-  .bar-fill-group .bar-fill{
-    border-radius:0;
-    min-width:0;
-    flex:0 0 auto;
   }
 
   /* 概要タブ：全体レイアウト */
@@ -274,10 +269,16 @@
     gap:16px;
     align-items:start;
   }
+  /* グリッド/フレックスアイテムはデフォルトでmin-width:autoのため、中の長いタイトル文字列が
+     コンテナ自体を押し広げてスマホ幅からはみ出す。min-width:0で中身のellipsis省略を有効にする */
+  .overview-grid > *{
+    min-width:0;
+  }
   .overview-col{
     display:flex;
     flex-direction:column;
     gap:16px;
+    min-width:0;
   }
   .overview-row{
     display:flex;
@@ -921,6 +922,7 @@
   <div class="view active" id="viewOverview">
     <div class="card">
       <p class="view-hint">一覧タブの絞り込み状態に関わらず、常に全件を対象にした全体状況です。カードや行をタップすると一覧タブ・担当者別タブで絞り込み表示します。</p>
+      <h3 class="settings-section-title">ステータス別件数（グループ単位で集計）</h3>
       <div class="summary" id="overviewKpiCards"></div>
     </div>
     <div class="overview-grid">
@@ -1658,11 +1660,18 @@ function renderOverviewKpi(){
   const orderedGroups = settings.groupOrder.filter(g => isCountableGroup(g) && groupTotals[g]);
 
   const totalCard = `<div class="stat"><div class="num">${items.length}</div><div class="label">総数</div></div>`;
-  const groupCards = orderedGroups.map(g => `
-    <div class="stat stat-toggle" data-group="${escapeHtml(g)}">
+  // カードのラベルはグループ名だが、それが「実際にはどのステータスの合計か」を一目でわかるように
+  // 構成ステータス名をサブテキストで添える（「グループではなくステータスとわかるように」との指摘対応）
+  const groupCards = orderedGroups.map(g => {
+    const memberStatuses = Object.keys(settings.statusGroupMap).filter(s => settings.statusGroupMap[s] === g);
+    const statusNote = memberStatuses.join('・');
+    return `
+    <div class="stat stat-toggle" data-group="${escapeHtml(g)}" title="ステータス: ${escapeHtml(statusNote)}">
       <div class="num">${groupTotals[g]}</div><div class="label">${escapeHtml(g)}</div>
+      <div class="stat-sub">${escapeHtml(statusNote)}</div>
     </div>
-  `).join('');
+  `;
+  }).join('');
   const overdueCount = items.filter(isOverdueItem).length;
   const overdueCard = `<div class="stat stat-toggle" id="overviewOverdueCard">
     <div class="num">${overdueCount}</div><div class="label">⚠超過</div>
@@ -1675,6 +1684,7 @@ function renderOverviewKpi(){
     el.addEventListener('click', () => {
       const g = el.dataset.group;
       const memberStatuses = Object.keys(settings.statusGroupMap).filter(s => settings.statusGroupMap[s] === g);
+      resetListFilterUI();
       activeStatuses = new Set(memberStatuses);
       showView('viewList');
       renderAll();
@@ -1683,12 +1693,28 @@ function renderOverviewKpi(){
   document.getElementById('overviewOverdueCard').addEventListener('click', navigateToOverdueInList);
 }
 
-// 「超過」フィルタを適用して一覧タブへ遷移（KPIカード・超過タスク一覧の行・すべて見るリンクで共通利用）
-function navigateToOverdueInList(){
-  const existingStatuses = [...new Set(rawItems.map(i => i.status || '(未設定)'))];
-  activeStatuses = new Set(existingStatuses.filter(s => !OVERDUE_EXCLUDED_STATUSES.includes(s)));
-  document.getElementById('dateFilterField').value = 'targetDate';
+// 一覧タブの絞り込みUIを一旦すべてクリアする（概要タブのカード/リンクから一覧タブへ遷移する直前に呼ぶ。
+// 呼ばずに既存の絞り込みへ単純加算すると、残っていたチャネル・役割・テキスト等の絞り込みと予期せず
+// ANDされ、「全部が表示されない／関係ないものが混ざる」といった不整合が起きるため）
+function resetListFilterUI(){
+  activeChannels = new Set();
+  syncChannelFilterUI();
+  activeRoleTags = new Set();
+  document.getElementById('listSourceFilter').value = '';
+  document.getElementById('textFilter').value = '';
+  document.getElementById('dateFilterField').value = 'date';
   document.getElementById('dateFilterFrom').value = '';
+  document.getElementById('dateFilterTo').value = '';
+}
+
+// 「超過」フィルタを適用して一覧タブへ遷移（KPIカード・超過タスク一覧のすべて見るリンクで共通利用）
+function navigateToOverdueInList(){
+  resetListFilterUI();
+  // 超過タスク一覧・KPIの⚠超過カードが数えているのはcountableなグループのステータスのみなので、
+  // ここで一覧タブへ渡す絞り込みもそれと一致させる（そうしないと「関係ないものも出てくる」となる）
+  const existingStatuses = [...new Set(rawItems.map(i => i.status || '(未設定)'))];
+  activeStatuses = new Set(existingStatuses.filter(s => isCountableStatus(s) && !OVERDUE_EXCLUDED_STATUSES.includes(s)));
+  document.getElementById('dateFilterField').value = 'targetDate';
   document.getElementById('dateFilterTo').value = addDaysStr(todayStr(), -1);
   showView('viewList');
   renderAll();
@@ -1716,15 +1742,21 @@ function renderOverviewOverdue(){
     : '';
 
   container.innerHTML = top.map(({ item: i, elapsed }) => `
-    <div class="overview-row">
+    <div class="overview-row" data-url="${escapeHtml(i.url || '')}">
       <span class="overview-row-title">${escapeHtml(i.title || '')}</span>
       <span class="overview-row-owner">${escapeHtml(getOwnerName(i))}</span>
       <span class="overview-row-date warn-critical">${elapsed}日超過</span>
     </div>
   `).join('') + seeAll;
 
+  // 個別行のタップは、一覧タブへ絞り込み遷移するのではなく該当タスクのURLを直接開く。
+  // 一覧タブ側に別の絞り込み（チャネル非表示等）が残っていると、遷移しても対象が見えず
+  // 「似たようなUIに飛ぶだけで分かりづらい」と指摘されたため、個別行はURL直行に変更した
   container.querySelectorAll('.overview-row').forEach(row => {
-    row.addEventListener('click', navigateToOverdueInList);
+    row.addEventListener('click', () => {
+      const url = row.dataset.url;
+      if(url) window.open(url, '_blank', 'noopener');
+    });
   });
   const seeAllEl = document.getElementById('overviewOverdueSeeAll');
   if(seeAllEl) seeAllEl.addEventListener('click', navigateToOverdueInList);
@@ -1748,22 +1780,18 @@ function renderOverviewUpcoming(){
   container.innerHTML = items.map(i => {
     const remain = Math.round((new Date(i.targetDate) - new Date(today)) / 86400000);
     const warnClass = remain <= 3 ? ' warn-critical' : (remain <= 7 ? ' warn-soon' : '');
-    return `<div class="overview-row">
+    return `<div class="overview-row" data-url="${escapeHtml(i.url || '')}">
       <span class="overview-row-title">${escapeHtml(i.title || '')}</span>
       <span class="overview-row-owner">${escapeHtml(getOwnerName(i))}</span>
       <span class="overview-row-date${warnClass}">${formatDate(i.targetDate)}</span>
     </div>`;
   }).join('');
 
-  container.querySelectorAll('.overview-row').forEach((row, idx) => {
+  // 超過タスク一覧と同じ理由で、個別行のタップは一覧タブへの絞り込み遷移ではなくURL直行にする
+  container.querySelectorAll('.overview-row').forEach(row => {
     row.addEventListener('click', () => {
-      const status = items[idx].status || '(未設定)';
-      activeStatuses = new Set([status]);
-      document.getElementById('dateFilterField').value = 'targetDate';
-      document.getElementById('dateFilterFrom').value = today;
-      document.getElementById('dateFilterTo').value = limit;
-      showView('viewList');
-      renderAll();
+      const url = row.dataset.url;
+      if(url) window.open(url, '_blank', 'noopener');
     });
   });
 }
@@ -1796,10 +1824,11 @@ function renderOverviewWorkload(){
     container.innerHTML = '<div class="empty">未完了タスクはありません</div>';
     return;
   }
-  const maxTotal = Math.max(1, ...rows.map(r => r.total));
 
+  // バーは常に100%表示（バー幅で件数を比較するのではなく、割合で滞留状況を見る用途のため）。
+  // 件数の大小は横に添える「計n件」ラベルで判断する（2026-07-29に一度「最大件数基準の相対幅」で
+  // 実装したが、「件数は計n件でわかるので、割合で停滞がわかる100%表示のほうが良い」と指摘を受けて変更）
   container.innerHTML = rows.map(r => {
-    const barPct = Math.round((r.total / maxTotal) * 100);
     const segments = segmentGroups.filter(g => r.byGroup[g]).map(g => {
       const segPct = Math.round((r.byGroup[g] / r.total) * 100);
       const color = g === '(グループなし)' ? '#9ca3af' : colorForGroup(g);
@@ -1807,16 +1836,30 @@ function renderOverviewWorkload(){
     }).join('');
     return `<div class="bar-row" data-owner="${escapeHtml(r.owner)}">
       <span class="bar-label">${escapeHtml(r.owner)}</span>
-      <span class="bar-track"><span class="bar-fill-group" style="width:${barPct}%">${segments}</span></span>
+      <span class="bar-track">${segments}</span>
       <span class="bar-value">計${r.total}件</span>
     </div>`;
   }).join('');
 
   container.querySelectorAll('.bar-row').forEach(row => {
     row.addEventListener('click', () => {
-      activeRoleTags = new Set([`owner:${row.dataset.owner}`]);
+      const owner = row.dataset.owner;
+      const sel = document.getElementById('ownerSelect');
+      const hasOption = [...sel.options].some(o => o.value === owner);
+      if(!hasOption) return;
+      // applyImpliedOwnerSelection()は流用せず、担当者別タブの表示に影響しうる状態を確実に
+      // 全解除してから遷移する。担当者別タブはテキスト/期間/リストを一覧タブと共有しているため
+      // （REQUIREMENTS.md 3.3）、一覧タブ側に残っていた期間フィルタ等の影響で「ワークロードの
+      // 計n件」と担当者別タブの表示件数が食い違う不具合があった。ownerActiveChannels/
+      // hiddenStatusesだけでなく、resetListFilterUI()で共有フィルタ側もクリアする
+      resetListFilterUI();
+      sel.value = owner;
+      selectedOwner = owner;
+      activeRoleTags = new Set([`owner:${owner}`]);
+      ownerActiveChannels = new Set();
+      hiddenStatuses = new Set();
+      syncOwnerChannelFilterUI();
       showView('viewOwner');
-      applyImpliedOwnerSelection();
       renderAll();
     });
   });
