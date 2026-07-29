@@ -1,10 +1,10 @@
 <!--
   @tool      DD-MEP タスク管理ダッシュボード
-  @version   v2026-07-29.2
+  @version   v2026-07-29.3
   @changelog
+    v2026-07-29.3 - 担当者別ワークロードの「計n件」ラベルが折り返されて見えていたのを修正。バーと同じ行に固定幅（30px）で収めていたレイアウトをやめ、氏名・件数を上段（バーの右上に件数を配置）、バー本体を下段のフル幅にする2段組みに変更
     v2026-07-29.2 - 概要タブの実機フィードバック6件を修正。①超過/直近期限タスクの個別行タップを、一覧タブへの絞り込み遷移からタスクURLを直接開く方式に変更（残存フィルタで対象が見えない問題を回避）。②スマホでタイトルが長いとレイアウトが横はみ出す不具合を修正（CSS Gridのmin-width:0漏れ）。③KPIカードにグループの構成ステータス名をサブテキストで表示。④「すべて見る」等の一覧タブ遷移前にチャネル/役割/テキスト/期間フィルタを全リセットするよう修正（残存フィルタで対象外の項目が混ざる/消える不具合）。⑤担当者別ワークロードのバーを最大値基準の相対幅から常に100%表示（内訳の割合を見せる）に変更。⑥ワークロード行タップ時に一覧タブ側の共有フィルタ（期間等）も含めて全解除するよう修正（表示件数の不一致を解消）
     v2026-07-29 - 「概要」タブを新規追加（先頭タブ、既定の表示先）。KPIサマリー・超過タスク一覧・直近期限タスク・担当者別ワークロード（積み上げバー）の4要素で構成。設定タブ①にグループ単位の「タスクとして集計する」チェックボックス（groupMeta.countable）を追加し、非集計グループは概要タブの全要素と一覧タブの総件数から除外されるように
-    v2026-07-27.12 - 担当者別タブの完了カードの並び順を、期限昇順（sortByDeadline流用）から完了日降順（sortByCompletedDate、最近完了したものが先頭）に変更
 -->
 <!DOCTYPE html>
 <html lang="ja">
@@ -223,9 +223,9 @@
   }
   .bar-row{
     display:flex;
-    align-items:center;
-    gap:8px;
-    margin-bottom:6px;
+    flex-direction:column;
+    gap:3px;
+    margin-bottom:10px;
     font-size:0.78rem;
     cursor:pointer;
     border-radius:6px;
@@ -234,16 +234,29 @@
   }
   .bar-row:hover{ background:#f3f4f6; }
   .bar-row.active{ background:#eaf1ff; }
+  .bar-row .bar-row-top{
+    display:flex;
+    align-items:baseline;
+    justify-content:space-between;
+    gap:8px;
+  }
   .bar-row .bar-label{
-    flex:0 0 84px;
-    text-align:right;
-    color:var(--sub);
+    flex:1 1 auto;
+    min-width:0;
+    color:var(--text);
     overflow:hidden;
     text-overflow:ellipsis;
     white-space:nowrap;
   }
+  .bar-row .bar-value{
+    flex:0 0 auto;
+    color:var(--sub);
+    font-weight:600;
+    font-variant-numeric:tabular-nums;
+    white-space:nowrap;
+  }
   .bar-row .bar-track{
-    flex:1 1 auto;
+    width:100%;
     background:#f0f1f4;
     border-radius:4px;
     height:16px;
@@ -255,11 +268,6 @@
     height:100%;
     min-width:2px;
     flex:0 0 auto;
-  }
-  .bar-row .bar-value{
-    flex:0 0 30px;
-    font-weight:600;
-    font-variant-numeric:tabular-nums;
   }
 
   /* 概要タブ：全体レイアウト */
@@ -884,7 +892,6 @@
     .table-wrap.role-panel-wrap{ max-height:200px; }
     .role-table{ font-size:0.72rem; }
     .role-table th:not(:first-child), .role-table td:not(:first-child){ width:52px; }
-    .bar-row .bar-label{ flex-basis:64px; }
     .task-card-meta{ grid-template-columns:minmax(56px,1fr) 92px 80px; font-size:0.68rem; }
   }
 </style>
@@ -1835,9 +1842,11 @@ function renderOverviewWorkload(){
       return `<span class="bar-fill" style="width:${segPct}%; background:${color}" title="${escapeHtml(g)}: ${r.byGroup[g]}件"></span>`;
     }).join('');
     return `<div class="bar-row" data-owner="${escapeHtml(r.owner)}">
-      <span class="bar-label">${escapeHtml(r.owner)}</span>
+      <span class="bar-row-top">
+        <span class="bar-label">${escapeHtml(r.owner)}</span>
+        <span class="bar-value">計${r.total}件</span>
+      </span>
       <span class="bar-track">${segments}</span>
-      <span class="bar-value">計${r.total}件</span>
     </div>`;
   }).join('');
 
