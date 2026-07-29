@@ -1,10 +1,10 @@
 <!--
   @tool      DD-MEP タスク管理ダッシュボード
-  @version   v2026-07-27.12
+  @version   v2026-07-29
   @changelog
+    v2026-07-29 - 「概要」タブを新規追加（先頭タブ、既定の表示先）。KPIサマリー・超過タスク一覧・直近期限タスク・担当者別ワークロード（積み上げバー）の4要素で構成。設定タブ①にグループ単位の「タスクとして集計する」チェックボックス（groupMeta.countable）を追加し、非集計グループは概要タブの全要素と一覧タブの総件数から除外されるように
     v2026-07-27.12 - 担当者別タブの完了カードの並び順を、期限昇順（sortByDeadline流用）から完了日降順（sortByCompletedDate、最近完了したものが先頭）に変更
     v2026-07-27.11 - 設定タブに「⑤編集リンク設定」を追加。読み込んだリストごとにサイトURL・リストGUIDを入力するフォームを設け、Setting.jsonの手編集なしでeditLinkConfigを設定できるように
-    v2026-07-27.10 - 編集リンク設定（EDIT_LINK_CONFIG）をソースコード定数からsettings.editLinkConfigに移行し、Setting.json経由で設定可能に。編集リンクのPageTypeを6（EditForm）から4（DispForm）に変更し、保存ボタンなしで即時保存されるようにした
 -->
 <!DOCTYPE html>
 <html lang="ja">
@@ -251,6 +251,81 @@
     flex:0 0 30px;
     font-weight:600;
     font-variant-numeric:tabular-nums;
+  }
+
+  /* 概要タブ：担当者別ワークロード（複数ステータスの積み上げバー）。既存の.bar-row系クラスを拡張して使う */
+  .bar-fill-group{
+    display:flex;
+    height:100%;
+    min-width:2%;
+    border-radius:4px;
+    overflow:hidden;
+  }
+  .bar-fill-group .bar-fill{
+    border-radius:0;
+    min-width:0;
+    flex:0 0 auto;
+  }
+
+  /* 概要タブ：全体レイアウト */
+  .overview-grid{
+    display:grid;
+    grid-template-columns:1.1fr 1fr;
+    gap:16px;
+    align-items:start;
+  }
+  .overview-col{
+    display:flex;
+    flex-direction:column;
+    gap:16px;
+  }
+  .overview-row{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    padding:7px 4px;
+    border-bottom:1px solid var(--border);
+    font-size:0.82rem;
+    cursor:pointer;
+    border-radius:6px;
+  }
+  .overview-row:hover{ background:#f7f9fb; }
+  .overview-row:last-child{ border-bottom:none; }
+  .overview-row .overview-row-title{
+    flex:1 1 auto;
+    min-width:0;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+  }
+  .overview-row .overview-row-owner{
+    flex:0 0 auto;
+    color:var(--sub);
+    font-size:0.76rem;
+    max-width:96px;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+  }
+  .overview-row .overview-row-date{
+    flex:0 0 auto;
+    font-variant-numeric:tabular-nums;
+    white-space:nowrap;
+    font-weight:600;
+  }
+  .overview-row .overview-row-date.warn-critical{ color:#b91c1c; }
+  .overview-row .overview-row-date.warn-soon{ color:#b45309; }
+  .overview-see-all{
+    display:block;
+    text-align:center;
+    font-size:0.8rem;
+    color:var(--accent);
+    padding:6px 0 2px;
+    cursor:pointer;
+    text-decoration:underline;
+  }
+  @media(max-width:800px){
+    .overview-grid{ grid-template-columns:1fr; }
   }
 
   .role-table{
@@ -687,8 +762,20 @@
   }
   .group-manage-actions{
     display:flex;
+    align-items:center;
     gap:4px;
   }
+  .countable-toggle{
+    display:flex;
+    align-items:center;
+    gap:4px;
+    font-size:0.72rem;
+    font-weight:400;
+    color:var(--sub);
+    white-space:nowrap;
+    margin-right:4px;
+  }
+  .countable-toggle input{ margin:0; }
   .move-btn{
     appearance:none;
     border:1px solid var(--border);
@@ -815,7 +902,8 @@
 
   <div class="tabs-row" id="tabsBar" style="display:none;">
     <div class="tabs">
-      <button class="tab-btn active" data-view="viewList">一覧</button>
+      <button class="tab-btn active" data-view="viewOverview">概要</button>
+      <button class="tab-btn" data-view="viewList">一覧</button>
       <button class="tab-btn" data-view="viewGroup">チャネル別</button>
       <button class="tab-btn" data-view="viewOwner">担当者別</button>
       <button class="tab-btn" data-view="viewSettings">設定</button>
@@ -829,8 +917,32 @@
 
 <div id="dashboard" style="display:none;">
 
+  <!-- 概要タブ -->
+  <div class="view active" id="viewOverview">
+    <div class="card">
+      <p class="view-hint">一覧タブの絞り込み状態に関わらず、常に全件を対象にした全体状況です。カードや行をタップすると一覧タブ・担当者別タブで絞り込み表示します。</p>
+      <div class="summary" id="overviewKpiCards"></div>
+    </div>
+    <div class="overview-grid">
+      <div class="overview-col">
+        <div class="card">
+          <h3 class="settings-section-title">⚠ 超過タスク</h3>
+          <div id="overviewOverdueList"></div>
+        </div>
+        <div class="card">
+          <h3 class="settings-section-title">直近の期限タスク（14日以内）</h3>
+          <div id="overviewUpcomingList"></div>
+        </div>
+      </div>
+      <div class="card">
+        <h3 class="settings-section-title">担当者別ワークロード（未完了）</h3>
+        <div id="overviewWorkload"></div>
+      </div>
+    </div>
+  </div>
+
   <!-- 一覧タブ -->
-  <div class="view active" id="viewList">
+  <div class="view" id="viewList">
 
     <div class="summary-mode-toggle" id="summaryModeToggle">
       <button type="button" class="mode-btn active" data-mode="group">グループ別</button>
@@ -979,12 +1091,33 @@ let statusGroupSettingsOrder = []; // 設定タブ「①ステータスのグル
 // 設定：Setting.json（基本）＋ localStorage（個人上書き）の二層構成
 // statusGroupMap: { "ステータス名": "グループ名" }
 // hiddenPeople: ["表示しない人の名前", ...]
-let settings = { statusGroupMap: {}, hiddenPeople: [], groupOrder: [], defaultStatuses: [], defaultChannels: [], statusColorMap: {}, editLinkConfig: {} };
-let baseSettingsFromFile = { statusGroupMap: {}, hiddenPeople: [], groupOrder: [], defaultStatuses: [], defaultChannels: [], statusColorMap: {}, editLinkConfig: {} };
+let settings = { statusGroupMap: {}, hiddenPeople: [], groupOrder: [], defaultStatuses: [], defaultChannels: [], statusColorMap: {}, editLinkConfig: {}, groupMeta: {} };
+let baseSettingsFromFile = { statusGroupMap: {}, hiddenPeople: [], groupOrder: [], defaultStatuses: [], defaultChannels: [], statusColorMap: {}, editLinkConfig: {}, groupMeta: {} };
 const SETTINGS_LS_KEY = 'ddmepDashboardSettingsOverride';
 
 // ここに含まれるステータスは「完了扱い」として担当者ボードで折りたたみ表示します
 const RESOLVED_STATUSES = ['完了'];
+
+// 概要タブの「超過」判定から除外するステータス（完了は終わっている、保留は待機中のため対象外）
+const OVERDUE_EXCLUDED_STATUSES = [...RESOLVED_STATUSES, '保留'];
+
+// yyyy-mm-dd文字列（getFilteredの期間絞り込みと同じ形式）で今日の日付を返す
+function todayStr(){
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+// yyyy-mm-dd文字列にn日加算した文字列を返す
+function addDaysStr(dateStr, n){
+  const d = new Date(dateStr + 'T00:00:00');
+  d.setDate(d.getDate() + n);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+// targetDate < 今日 かつ 完了・保留以外（概要タブ「超過」の定義）
+function isOverdueItem(i){
+  if(!i.targetDate) return false;
+  if(OVERDUE_EXCLUDED_STATUSES.includes(i.status || '(未設定)')) return false;
+  return i.targetDate < todayStr();
+}
 
 // リストごとの編集リンク設定（_sourceList のファイル名部分をキーにする）
 // settings.editLinkConfig = { リスト名: { site: SharePointサイトURL, listId: リストのGUID } }
@@ -1033,6 +1166,13 @@ function colorForStatus(status){
     autoColorCache[status] = COLOR_PALETTE[idx];
   }
   return autoColorCache[status];
+}
+
+// グループ単位の色は専用のマップを持たず、そのグループに属する（任意の）ステータスの色をそのまま使う。
+// ステータス側の色設定（自動採番／手動設定）と常に一致させるための方針
+function colorForGroup(groupName){
+  const member = Object.keys(settings.statusGroupMap).find(s => settings.statusGroupMap[s] === groupName);
+  return member ? colorForStatus(member) : '#9ca3af';
 }
 
 document.getElementById('fileInput').addEventListener('change', function(e){
@@ -1144,8 +1284,22 @@ function normalizeSettings(obj){
     defaultStatuses: (obj && Array.isArray(obj.defaultStatuses)) ? obj.defaultStatuses : [],
     defaultChannels: (obj && Array.isArray(obj.defaultChannels)) ? obj.defaultChannels : [],
     statusColorMap: (obj && typeof obj.statusColorMap === 'object' && obj.statusColorMap) || {},
-    editLinkConfig: (obj && typeof obj.editLinkConfig === 'object' && obj.editLinkConfig) || {}
+    editLinkConfig: (obj && typeof obj.editLinkConfig === 'object' && obj.editLinkConfig) || {},
+    groupMeta: (obj && typeof obj.groupMeta === 'object' && obj.groupMeta) || {}
   };
+}
+
+// グループ単位の「タスクとして集計する」フラグ。未設定（groupMetaに項目がない）場合はtrue扱い
+// （既存データとの後方互換のため、明示的にfalseにしたグループだけが概要タブの集計から除外される）
+function isCountableGroup(groupName){
+  const meta = settings.groupMeta[groupName];
+  return !meta || meta.countable !== false;
+}
+// ステータス単位でも判定できるようにするラッパー（グループ未割当のステータスはcountable扱い）
+function isCountableStatus(status){
+  const g = settings.statusGroupMap[status];
+  if(!g) return true;
+  return isCountableGroup(g);
 }
 
 // チャネル名が「T」で始まるものは「タスクチャネル」、それ以外は「その他」として分類する
@@ -1467,8 +1621,205 @@ function renderAll(){
   renderMatrix('groupMatrix', 'channel', 'チャネル', getFiltered({exclude:['channel']}), 'name');
   renderOwnerStatusToggle();
   renderOwnerBoard();
+  renderOverview();
   updateFilterStatus();
   adjustTableWrapHeights();
+}
+
+/* ---------- 概要タブ ---------- */
+// 概要タブは「今の全体状況」を常に俯瞰する場所として、一覧タブのテキスト/期間/リスト/ステータス/
+// チャネル/役割といった一時的な絞り込みUIの状態からは完全に独立させる（rawItemsをそのまま使う）。
+// これらのカード・行のタップ自体が一覧タブへ絞り込み条件を渡す入口になっているため、もし概要タブ側が
+// 一覧タブの状態を引き継ぐ設計だと、「超過タスクのすべて見る」等で一覧タブへ遷移した後に概要タブへ
+// 戻ると、遷移時にセットした期間フィルタが概要タブ自身の集計にも残ってしまい数字が食い違う
+// （担当者別・チャネル別タブとも異なる、概要タブ固有の設計判断）
+function overviewScopedItems(){
+  return rawItems;
+}
+
+function renderOverview(){
+  renderOverviewKpi();
+  renderOverviewOverdue();
+  renderOverviewUpcoming();
+  renderOverviewWorkload();
+}
+
+function renderOverviewKpi(){
+  const items = overviewScopedItems().filter(i => isCountableStatus(i.status || '(未設定)'));
+  const byStatus = countBy(items, i => i.status || '(未設定)');
+  syncGroupOrder();
+
+  const groupTotals = {};
+  Object.entries(byStatus).forEach(([status, num]) => {
+    const g = settings.statusGroupMap[status];
+    if(!g || !isCountableGroup(g)) return;
+    groupTotals[g] = (groupTotals[g] || 0) + num;
+  });
+  const orderedGroups = settings.groupOrder.filter(g => isCountableGroup(g) && groupTotals[g]);
+
+  const totalCard = `<div class="stat"><div class="num">${items.length}</div><div class="label">総数</div></div>`;
+  const groupCards = orderedGroups.map(g => `
+    <div class="stat stat-toggle" data-group="${escapeHtml(g)}">
+      <div class="num">${groupTotals[g]}</div><div class="label">${escapeHtml(g)}</div>
+    </div>
+  `).join('');
+  const overdueCount = items.filter(isOverdueItem).length;
+  const overdueCard = `<div class="stat stat-toggle" id="overviewOverdueCard">
+    <div class="num">${overdueCount}</div><div class="label">⚠超過</div>
+  </div>`;
+
+  const container = document.getElementById('overviewKpiCards');
+  container.innerHTML = totalCard + groupCards + overdueCard;
+
+  container.querySelectorAll('.stat-toggle[data-group]').forEach(el => {
+    el.addEventListener('click', () => {
+      const g = el.dataset.group;
+      const memberStatuses = Object.keys(settings.statusGroupMap).filter(s => settings.statusGroupMap[s] === g);
+      activeStatuses = new Set(memberStatuses);
+      showView('viewList');
+      renderAll();
+    });
+  });
+  document.getElementById('overviewOverdueCard').addEventListener('click', navigateToOverdueInList);
+}
+
+// 「超過」フィルタを適用して一覧タブへ遷移（KPIカード・超過タスク一覧の行・すべて見るリンクで共通利用）
+function navigateToOverdueInList(){
+  const existingStatuses = [...new Set(rawItems.map(i => i.status || '(未設定)'))];
+  activeStatuses = new Set(existingStatuses.filter(s => !OVERDUE_EXCLUDED_STATUSES.includes(s)));
+  document.getElementById('dateFilterField').value = 'targetDate';
+  document.getElementById('dateFilterFrom').value = '';
+  document.getElementById('dateFilterTo').value = addDaysStr(todayStr(), -1);
+  showView('viewList');
+  renderAll();
+}
+
+function renderOverviewOverdue(){
+  const items = overviewScopedItems()
+    .filter(i => isCountableStatus(i.status || '(未設定)'))
+    .filter(isOverdueItem);
+  const today = todayStr();
+  const withElapsed = items
+    .map(i => ({ item: i, elapsed: Math.round((new Date(today) - new Date(i.targetDate)) / 86400000) }))
+    .sort((a, b) => b.elapsed - a.elapsed);
+
+  const container = document.getElementById('overviewOverdueList');
+  if(!withElapsed.length){
+    container.innerHTML = '<div class="empty">超過タスクはありません</div>';
+    return;
+  }
+
+  const LIMIT = 8;
+  const top = withElapsed.slice(0, LIMIT);
+  const seeAll = withElapsed.length > LIMIT
+    ? `<span class="overview-see-all" id="overviewOverdueSeeAll">すべて見る（${withElapsed.length}件）</span>`
+    : '';
+
+  container.innerHTML = top.map(({ item: i, elapsed }) => `
+    <div class="overview-row">
+      <span class="overview-row-title">${escapeHtml(i.title || '')}</span>
+      <span class="overview-row-owner">${escapeHtml(getOwnerName(i))}</span>
+      <span class="overview-row-date warn-critical">${elapsed}日超過</span>
+    </div>
+  `).join('') + seeAll;
+
+  container.querySelectorAll('.overview-row').forEach(row => {
+    row.addEventListener('click', navigateToOverdueInList);
+  });
+  const seeAllEl = document.getElementById('overviewOverdueSeeAll');
+  if(seeAllEl) seeAllEl.addEventListener('click', navigateToOverdueInList);
+}
+
+function renderOverviewUpcoming(){
+  const today = todayStr();
+  const limit = addDaysStr(today, 14);
+  const items = overviewScopedItems()
+    .filter(i => isCountableStatus(i.status || '(未設定)'))
+    .filter(i => i.targetDate && !OVERDUE_EXCLUDED_STATUSES.includes(i.status || '(未設定)'))
+    .filter(i => i.targetDate >= today && i.targetDate <= limit)
+    .sort((a, b) => a.targetDate < b.targetDate ? -1 : (a.targetDate > b.targetDate ? 1 : 0));
+
+  const container = document.getElementById('overviewUpcomingList');
+  if(!items.length){
+    container.innerHTML = '<div class="empty">直近14日以内が期限のタスクはありません</div>';
+    return;
+  }
+
+  container.innerHTML = items.map(i => {
+    const remain = Math.round((new Date(i.targetDate) - new Date(today)) / 86400000);
+    const warnClass = remain <= 3 ? ' warn-critical' : (remain <= 7 ? ' warn-soon' : '');
+    return `<div class="overview-row">
+      <span class="overview-row-title">${escapeHtml(i.title || '')}</span>
+      <span class="overview-row-owner">${escapeHtml(getOwnerName(i))}</span>
+      <span class="overview-row-date${warnClass}">${formatDate(i.targetDate)}</span>
+    </div>`;
+  }).join('');
+
+  container.querySelectorAll('.overview-row').forEach((row, idx) => {
+    row.addEventListener('click', () => {
+      const status = items[idx].status || '(未設定)';
+      activeStatuses = new Set([status]);
+      document.getElementById('dateFilterField').value = 'targetDate';
+      document.getElementById('dateFilterFrom').value = today;
+      document.getElementById('dateFilterTo').value = limit;
+      showView('viewList');
+      renderAll();
+    });
+  });
+}
+
+function renderOverviewWorkload(){
+  const items = overviewScopedItems()
+    .filter(i => isCountableStatus(i.status || '(未設定)'))
+    .filter(i => !RESOLVED_STATUSES.includes(i.status || '(未設定)'));
+
+  syncGroupOrder();
+  const countableGroups = settings.groupOrder.filter(isCountableGroup);
+  const segmentGroups = [...countableGroups, '(グループなし)'];
+
+  const byOwner = {};
+  items.forEach(i => {
+    const owner = getOwnerName(i);
+    if(owner === '(未設定)') return;
+    const g = settings.statusGroupMap[i.status || '(未設定)'] || '(グループなし)';
+    if(!byOwner[owner]) byOwner[owner] = { total: 0, byGroup: {} };
+    byOwner[owner].total++;
+    byOwner[owner].byGroup[g] = (byOwner[owner].byGroup[g] || 0) + 1;
+  });
+
+  const rows = Object.entries(byOwner)
+    .map(([owner, info]) => ({ owner, ...info }))
+    .sort((a, b) => b.total - a.total);
+
+  const container = document.getElementById('overviewWorkload');
+  if(!rows.length){
+    container.innerHTML = '<div class="empty">未完了タスクはありません</div>';
+    return;
+  }
+  const maxTotal = Math.max(1, ...rows.map(r => r.total));
+
+  container.innerHTML = rows.map(r => {
+    const barPct = Math.round((r.total / maxTotal) * 100);
+    const segments = segmentGroups.filter(g => r.byGroup[g]).map(g => {
+      const segPct = Math.round((r.byGroup[g] / r.total) * 100);
+      const color = g === '(グループなし)' ? '#9ca3af' : colorForGroup(g);
+      return `<span class="bar-fill" style="width:${segPct}%; background:${color}" title="${escapeHtml(g)}: ${r.byGroup[g]}件"></span>`;
+    }).join('');
+    return `<div class="bar-row" data-owner="${escapeHtml(r.owner)}">
+      <span class="bar-label">${escapeHtml(r.owner)}</span>
+      <span class="bar-track"><span class="bar-fill-group" style="width:${barPct}%">${segments}</span></span>
+      <span class="bar-value">計${r.total}件</span>
+    </div>`;
+  }).join('');
+
+  container.querySelectorAll('.bar-row').forEach(row => {
+    row.addEventListener('click', () => {
+      activeRoleTags = new Set([`owner:${row.dataset.owner}`]);
+      showView('viewOwner');
+      applyImpliedOwnerSelection();
+      renderAll();
+    });
+  });
 }
 
 // 一覧タブ・チャネル別タブのメインテーブルを、固定px値ではなく実際の画面残り高さに合わせて伸縮させる
@@ -1583,7 +1934,8 @@ function setupSummaryModeToggle(){
 }
 
 function renderSummary(items, statusItems){
-  const total = items.length;
+  // 総件数は「タスクとして集計する」グループ（countable）のみを対象にする（非countableは周知・常時運用など集計対象外の分類のため）
+  const total = items.filter(i => isCountableStatus(i.status || '(未設定)')).length;
   const byStatus = countBy(statusItems, i => i.status || '(未設定)');
   const totalCard = `<div class="stat"><div class="num">${total}</div><div class="label">総件数</div></div>`;
   const container = document.getElementById('summaryCards');
@@ -1955,6 +2307,10 @@ function renderGroupManagement(){
     <div class="group-manage-row">
       <span>${escapeHtml(g)}</span>
       <span class="group-manage-actions">
+        <label class="countable-toggle" title="概要タブのKPI・超過・直近期限・ワークロードの集計対象にする">
+          <input type="checkbox" class="countable-checkbox" data-group="${escapeHtml(g)}"${isCountableGroup(g) ? ' checked' : ''}>
+          タスクとして集計する
+        </label>
         <button type="button" class="move-btn" data-group="${escapeHtml(g)}" data-dir="-1"${idx === 0 ? ' disabled' : ''}>▲</button>
         <button type="button" class="move-btn" data-group="${escapeHtml(g)}" data-dir="1"${idx === order.length - 1 ? ' disabled' : ''}>▼</button>
         <button type="button" class="rename-btn" data-group="${escapeHtml(g)}">✏️ 名称変更</button>
@@ -1967,6 +2323,14 @@ function renderGroupManagement(){
   });
   container.querySelectorAll('.move-btn').forEach(btn => {
     btn.addEventListener('click', () => moveGroup(btn.dataset.group, parseInt(btn.dataset.dir, 10)));
+  });
+  container.querySelectorAll('.countable-checkbox').forEach(cb => {
+    cb.addEventListener('change', () => {
+      const g = cb.dataset.group;
+      if(!settings.groupMeta[g]) settings.groupMeta[g] = {};
+      settings.groupMeta[g].countable = cb.checked;
+      onSettingsChanged();
+    });
   });
 }
 
