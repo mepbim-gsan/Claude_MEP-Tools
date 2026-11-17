@@ -1,0 +1,7 @@
+{
+  "name": "ifc-analyzer",
+  "private": true,
+  "type": "module",
+  "scripts": { "build": "node build.mjs" },
+  "devDependencies": { "esbuild": "0.28.2", "web-ifc": "0.0.79" }
+}

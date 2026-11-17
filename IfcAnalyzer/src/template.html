@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IFC Analyzer</title>
+<style>
+:root{
+  --bg:#f3f4f6; --panel:#ffffff; --border:#d9dde3; --text:#1c2128; --sub:#6b7280;
+  --accent:#1a3a6b; --accent-soft:#e3e9f3; --hover:#eef1f5; --warn:#b45309; --bar:#7c9cd0;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#15181d; --panel:#1d2128; --border:#323844; --text:#e6e8eb; --sub:#9aa3af;
+    --accent:#8fb0e6; --accent-soft:#25324a; --hover:#262c36; --warn:#f59e0b; --bar:#4f6fa3;
+  }
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Hiragino Sans","Yu Gothic UI","Yu Gothic",sans-serif;font-size:13px;color:var(--text);background:var(--bg);display:flex;flex-direction:column;overflow:hidden}
+button,select,input{font:inherit;color:inherit}
+button{background:var(--panel);border:1px solid var(--border);border-radius:6px;padding:4px 10px;cursor:pointer;white-space:nowrap}
+button:hover{background:var(--hover)}
+button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+select{background:var(--panel);border:1px solid var(--border);border-radius:6px;padding:3px 6px;height:28px}
+header{display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--panel);border-bottom:1px solid var(--border);flex-wrap:wrap}
+header h1{font-size:14px;margin:0 6px 0 0;color:var(--accent)}
+header .grow{flex:1}
+.app-ver{color:var(--sub);font-size:11px}
+.muted{color:var(--sub)}
+#models{display:flex;gap:8px;padding:8px 10px;flex-wrap:wrap;border-bottom:1px solid var(--border);background:var(--panel)}
+.mcard{border:1px solid var(--border);border-radius:8px;padding:6px 10px;min-width:240px;max-width:360px}
+.mcard .t{display:flex;gap:6px;align-items:center}
+.mcard b{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mcard .meta{color:var(--sub);font-size:11px;margin-top:2px;line-height:1.5}
+.mcard .verdict{margin-top:4px;font-weight:600;color:var(--accent)}
+.x{border:none;background:none;padding:0 4px;color:var(--sub)}
+.tabs{display:flex;gap:2px;padding:0 10px;background:var(--panel);border-bottom:1px solid var(--border);flex-wrap:wrap}
+.tabs button{border:none;border-radius:0;border-bottom:2px solid transparent;background:none;padding:8px 12px}
+.tabs button.on{border-bottom-color:var(--accent);color:var(--accent);font-weight:600}
+#body{flex:1;min-height:0;display:flex;flex-direction:column}
+.tools{display:flex;gap:8px;align-items:center;padding:8px 10px;flex-wrap:wrap}
+.desc{padding:0 10px 6px;color:var(--sub);font-size:12px;line-height:1.6}
+.wrap{flex:1;overflow:auto;min-height:0;border-top:1px solid var(--border);background:var(--panel)}
+table{border-collapse:collapse;width:max-content;min-width:100%}
+th,td{border-bottom:1px solid var(--border);border-right:1px solid var(--border);padding:4px 8px;text-align:left;white-space:nowrap;max-width:420px;overflow:hidden;text-overflow:ellipsis}
+th{position:sticky;top:0;background:var(--panel);z-index:1;cursor:pointer;user-select:none;font-weight:600}
+tbody tr:hover{background:var(--hover)}
+td.num{text-align:right;font-variant-numeric:tabular-nums}
+td.sec{background:var(--accent-soft);font-weight:600;color:var(--accent)}
+.bar{display:inline-block;height:8px;background:var(--bar);border-radius:2px;vertical-align:middle;margin-right:6px}
+#drop{flex:1;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:8px;color:var(--sub);text-align:center;padding:20px}
+#drop b{font-size:16px;color:var(--text)}
+body.dragover #drop, body.dragover .wrap{outline:3px dashed var(--accent);outline-offset:-6px}
+#busy{position:fixed;inset:0;background:rgba(0,0,0,.35);display:none;align-items:center;justify-content:center;z-index:10}
+#busy .box{background:var(--panel);border-radius:10px;padding:16px 20px;min-width:320px}
+#busy .bar2{height:6px;background:var(--border);border-radius:3px;overflow:hidden;margin-top:10px}
+#busy .bar2 i{display:block;height:100%;width:0;background:var(--accent)}
+</style>
+</head>
+<body>
+<header>
+  <h1>IFC Analyzer</h1>
+  <button class="primary" id="btnOpen">IFCを開く</button>
+  <input type="file" id="file" accept=".ifc" multiple hidden>
+  <span class="muted">IFCがタイプで構成されているか、インスタンスごとに持っているかを分析します（形状は生成しません）</span>
+  <span class="grow"></span>
+  <span class="app-ver"></span>
+</header>
+<div id="models"></div>
+<div class="tabs" id="tabs"></div>
+<div id="body">
+  <div id="drop"><b>IFCファイルをここにドロップ</b><span>または「IFCを開く」から選択（複数選択可・モデルを並べて比較できます）</span></div>
+  <div id="view" style="display:none;flex:1;min-height:0;flex-direction:column">
+    <div class="tools"><span id="modelSelWrap"><label class="muted">モデル</label> <select id="modelSel"></select></span><button id="btnCsv">CSV出力</button><span id="info" class="muted"></span></div>
+    <div class="desc" id="desc"></div>
+    <div class="wrap"><table id="tbl"></table></div>
+  </div>
+</div>
+<div id="busy"><div class="box"><div id="busyMsg">解析中…</div><div class="bar2"><i id="busyBar"></i></div></div></div>
+<script type="application/octet-stream" id="wasm-b64">/*__WASM__*/</script>
+<script>/*__BUNDLE__*/</script>
+</body>
+</html>
