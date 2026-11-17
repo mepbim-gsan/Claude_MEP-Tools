@@ -65,7 +65,7 @@ select{font-family:var(--sans);font-size:.78rem}
 .gear{width:40px;padding:5px 0;border:1.5px solid var(--bd);border-radius:7px;background:var(--sf2);font-size:1rem;cursor:pointer;color:var(--tx2)}
 .gear.on{border-color:var(--accent);color:var(--accent);background:var(--accent-l)}
 .sgrid[hidden]{display:none}
-.lrow{display:flex;align-items:flex-end;gap:4px}.lrow label{flex:1}.lrow .btn{padding:6px 8px}
+.lrow{display:flex;align-items:flex-end;gap:4px}.lrow label{flex:1}.lrow .btn{padding:6px 6px}
 .pbtns{display:flex;align-items:center;gap:4px;flex-wrap:wrap;border-top:1px dashed var(--bd);padding-top:6px}
 .pbtns span{font-size:.64rem;color:var(--tx3);margin-right:2px}
 .ver a{color:var(--tx3)}
@@ -108,13 +108,13 @@ select{font-family:var(--sans);font-size:.78rem}
   <div class="sgrid only-d" hidden>
     <label>摩擦損失 上限 [Pa/m]<input id="d_R" class="num" type="number" step="0.1" inputmode="decimal" placeholder="制限なし"></label>
     <label>風速 上限 [m/s]<input id="d_V" class="num" type="number" step="0.5" inputmode="decimal" placeholder="制限なし"></label>
-    <div class="full lrow"><label>材質<select id="d_mat"></select></label><button class="btn" id="mat_add">＋追加</button><button class="btn" id="mat_del">削除</button></div>
+    <div class="full lrow"><label>材質<select id="d_mat"></select></label><button class="btn" id="mat_add">＋</button><button class="btn" id="mat_ren">編集</button><button class="btn" id="mat_del">削除</button></div>
     <label>高さ 上限 [mm]<input id="d_Hmax" class="num" type="number" step="50" inputmode="numeric" placeholder="なし"></label>
     <label>アスペクト比 上限<input id="d_asp" class="num" type="number" step="0.5" inputmode="decimal"></label>
     <label>角ダクト 刻み [mm]<select id="d_step"><option>25</option><option>50</option><option>100</option></select></label>
     <label>丸ダクト 刻み [mm]<select id="d_rstep"><option>25</option><option>50</option></select></label>
     <label class="full">保温厚 [mm]<select id="d_ins"><option value="0">なし</option><option>25</option><option>40</option><option>50</option></select></label>
-    <div class="full pbtns"><span>種類</span><button class="btn" data-pa="d">＋現在値で追加</button><button class="btn" data-pu="d">上書き</button><button class="btn" data-pd="d">削除</button></div>
+    <div class="full pbtns"><span>種類</span><button class="btn" data-pa="d">＋現在値で追加</button><button class="btn" data-pr="d">名前変更</button><button class="btn" data-pu="d">上書き</button><button class="btn" data-pd="d">削除</button></div>
   </div>
   <div class="sgrid only-g" hidden>
     <label>開口率 [%]<input id="g_ratio" class="num" type="number" step="1" inputmode="decimal"></label>
@@ -123,7 +123,7 @@ select{font-family:var(--sans);font-size:.78rem}
     <label>刻み [mm]<select id="g_step"><option>25</option><option>50</option><option>100</option></select></label>
     <label>高さ 上限 [mm]<input id="g_Hmax" class="num" type="number" step="50" inputmode="numeric" placeholder="なし"></label>
     <label>アスペクト比 上限<input id="g_asp" class="num" type="number" step="0.5" inputmode="decimal"></label>
-    <div class="full pbtns"><span>種類</span><button class="btn" data-pa="g">＋現在値で追加</button><button class="btn" data-pu="g">上書き</button><button class="btn" data-pd="g">削除</button></div>
+    <div class="full pbtns"><span>種類</span><button class="btn" data-pa="g">＋現在値で追加</button><button class="btn" data-pr="g">名前変更</button><button class="btn" data-pu="g">上書き</button><button class="btn" data-pd="g">削除</button></div>
   </div>
   <div class="sgrid" hidden>
     <div class="full pbtns"><span>設定</span><button class="btn" id="exp">書き出し</button><button class="btn" id="imp">読み込み</button><button class="btn" id="rst">初期化</button><input type="file" id="impf" accept=".json,application/json" hidden></div>
@@ -197,7 +197,7 @@ select{font-family:var(--sans);font-size:.78rem}
 <div class="toast" id="toast"></div>
 
 <script>
-const APP_VERSION = 'v02_2026-11-18';
+const APP_VERSION = 'v02_2026-11-18.2';
 document.querySelectorAll('.app-ver').forEach(el => el.textContent = APP_VERSION);
 
 const RHO = 1.2, NU = 15.1e-6;
@@ -544,6 +544,14 @@ document.querySelectorAll('[data-pu]').forEach(b => b.onclick = () => {
   S[grp].preset = idx;
   afterChange(); toast('上書きしました');
 });
+document.querySelectorAll('[data-pr]').forEach(b => b.onclick = () => {
+  const grp = b.dataset.pr, list = presets(grp), i = +S[grp].preset;
+  if (!list[i]) { toast('名前を変更する種類を選択してください'); return; }
+  const name = (prompt('新しい名前', list[i].name) || '').trim();
+  if (!name || name === list[i].name) return;
+  list[i].name = name;
+  afterChange(); toast('名前を変更しました');
+});
 document.querySelectorAll('[data-pd]').forEach(b => b.onclick = () => {
   const grp = b.dataset.pd, list = presets(grp), i = +S[grp].preset;
   if (!list[i]) { toast('削除する種類を選択してください'); return; }
@@ -560,6 +568,16 @@ $('mat_add').onclick = () => {
   const id = 'm' + Date.now();
   S.mats.push({ id, name, e }); S.d.mat = id; S.d.preset = -1;
   afterChange(); toast('追加しました');
+};
+$('mat_ren').onclick = () => {
+  const m = S.mats.find(x => x.id === S.d.mat);
+  if (!m) return;
+  const name = (prompt('材質の名前', m.name) || '').trim();
+  if (!name) return;
+  const e = parseFloat(prompt('粗さ ε [mm]', m.e));
+  if (!(e >= 0)) { toast('ε の値が不正です'); return; }
+  m.name = name; m.e = e;
+  afterChange(); toast('変更しました');
 };
 $('mat_del').onclick = () => {
   const i = S.mats.findIndex(m => m.id === S.d.mat);
