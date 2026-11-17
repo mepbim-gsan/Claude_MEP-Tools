@@ -57,6 +57,10 @@ select{font-family:var(--sans);font-size:.78rem}
 .res .v{font-family:var(--mono);font-size:.84rem;font-weight:500;white-space:nowrap}
 .res .v.ok{color:var(--green)}.res .v.over{color:var(--red)}
 .res .full{grid-column:1/-1}
+.stp{width:34px;height:32px;border:1.5px solid var(--bd);border-radius:7px;background:var(--sf2);font-size:1.05rem;color:var(--tx2);cursor:pointer;-webkit-tap-highlight-color:transparent}
+.stp:active{background:var(--accent);color:#fff}
+#g_n{width:56px;text-align:center}
+.per{font-size:.68rem;color:var(--tx3);font-family:var(--mono);margin-left:4px}
 .setline{font-size:.72rem;color:var(--tx2);margin-bottom:6px}
 .gear{width:40px;padding:5px 0;border:1.5px solid var(--bd);border-radius:7px;background:var(--sf2);font-size:1rem;cursor:pointer;color:var(--tx2)}
 .modal{position:fixed;inset:0;background:rgba(20,30,50,.45);display:flex;align-items:flex-start;justify-content:center;padding:24px 8px;overflow:auto;z-index:10}
@@ -113,6 +117,13 @@ select{font-family:var(--sans);font-size:.78rem}
     <button class="gear" id="gear" title="設定">⚙</button>
     <select id="d_preset" class="grow only-d"></select>
     <select id="g_preset" class="grow only-g"></select>
+  </div>
+  <div class="row only-g">
+    <span class="lbl">台数</span>
+    <button class="stp" id="n_dec">−</button>
+    <input id="g_n" class="num" type="number" min="1" step="1" inputmode="numeric">
+    <button class="stp" id="n_inc">＋</button>
+    <span class="per" id="g_per"></span>
   </div>
 </div>
 
@@ -215,7 +226,6 @@ select{font-family:var(--sans);font-size:.78rem}
         <label>保温厚 [mm]</label><select id="md_ins"><option value="0">なし</option><option>25</option><option>40</option><option>50</option></select>
       </div>
       <div class="mgrid only-g">
-        <label>台数</label><input id="mg_n" class="num" type="number" min="1" step="1" inputmode="numeric">
         <label>高さ上限 [mm]</label><input id="mg_Hmax" class="num" type="number" step="50" inputmode="numeric" placeholder="なし">
         <label>刻み [mm]</label><select id="mg_step"><option>25</option><option>50</option><option>100</option></select>
       </div>
@@ -227,7 +237,7 @@ select{font-family:var(--sans);font-size:.78rem}
 <div class="toast" id="toast"></div>
 
 <script>
-const APP_VERSION = 'v02_2026-11-18.3';
+const APP_VERSION = 'v02_2026-11-18.4';
 document.querySelectorAll('.app-ver').forEach(el => el.textContent = APP_VERSION);
 
 const RHO = 1.2, NU = 15.1e-6;
@@ -462,14 +472,15 @@ function renderGrille() {
   const note = $('g_note');
   const gn = Math.max(1, Math.floor(num(S.g.n) || 1));
   $('g_summary').textContent = `Setting: 開口率 ${S.g.ratio || '—'} % , 面風速 ${S.g.V || '—'} m/s` +
-    (gn > 1 ? ` , ${gn}台` : '') + (num(S.g.Hmax) ? ` , H≤${S.g.Hmax}` : '');
-  if (!(Q > 0)) { $('g_cands').innerHTML = ''; note.textContent = '風量を入力してください'; note.className = 'note warn'; gCandCache = []; renderGrilleRes(); return; }
+    (num(S.g.Hmax) ? ` , H≤${S.g.Hmax}` : '');
+  if (!(Q > 0)) { $('g_cands').innerHTML = ''; $('g_per').textContent = ''; note.textContent = '風量を入力してください'; note.className = 'note warn'; gCandCache = []; renderGrilleRes(); return; }
   const r = grilleCalc(Q);
   if (r.err) { $('g_cands').innerHTML = ''; note.textContent = r.err; note.className = 'note warn'; gCandCache = []; renderGrilleRes(); return; }
   gCandCache = r.list;
   renderCands($('g_cands'), r.list, gSel, c => { gSel = { W: c.W, H: c.H || null }; $('g_W').value = c.W; $('g_H').value = c.H || ''; renderGrille(); });
   note.className = 'note';
-  note.textContent = (r.n > 1 ? `1台あたり ${fmtN(toUnit(r.q1))} ${UNIT_LBL[S.unit]} ／ ` : '') + `有効面積 ${r.Aeff.toFixed(3)} m² ／ 必要面積 ${r.Areq.toFixed(3)} m²`;
+  $('g_per').textContent = `1台あたり ${fmtN(toUnit(r.q1))} ${UNIT_LBL[S.unit]}`;
+  note.textContent = `有効面積 ${r.Aeff.toFixed(3)} m² ／ 必要面積 ${r.Areq.toFixed(3)} m²`;
   renderGrilleRes();
 }
 
@@ -521,7 +532,7 @@ const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;',
 const grpOf = () => S.tab === 'grille' ? 'g' : 'd';
 const presets = grp => grp === 'd' ? S.dPresets : S.gPresets;
 const SF = { d: { mat: 'md_mat', e: 'md_e', V: 'md_V', R: 'md_R', asp: 'md_asp' }, g: { ratio: 'mg_ratio', V: 'mg_V', asp: 'mg_asp' } };
-const CF = { d: { Hmax: 'md_Hmax', step: 'md_step', rstep: 'md_rstep', ins: 'md_ins' }, g: { n: 'mg_n', Hmax: 'mg_Hmax', step: 'mg_step' } };
+const CF = { d: { Hmax: 'md_Hmax', step: 'md_step', rstep: 'md_rstep', ins: 'md_ins' }, g: { Hmax: 'mg_Hmax', step: 'mg_step' } };
 const same = (a, b) => String(a ?? '') === String(b ?? '');
 const styleOf = grp => Object.fromEntries(Object.keys(SF[grp]).map(k => [k, S[grp][k]]));
 function matchPreset(grp) {
@@ -538,6 +549,7 @@ function fillMain() {
     el.value = S[grp].preset;
   });
   $('q').value = S.q; $('unit').value = S.unit;
+  $('g_n').value = S.g.n;
 }
 ['d', 'g'].forEach(grp => $(grp + '_preset').addEventListener('change', () => {
   const i = +$(grp + '_preset').value, p = presets(grp)[i];
@@ -547,6 +559,14 @@ function fillMain() {
 MATS.forEach(m => $('md_mat').add(new Option(m.name, m.id)));
 $('m_mat').innerHTML = MATS.filter(m => m.e != null).map(m => `<tr><td>${esc(m.name)}</td><td>${m.e}</td></tr>`).join('');
 fillMain();
+function setN(n) {
+  n = Math.max(1, Math.floor(n) || 1);
+  S.g.n = n; $('g_n').value = n; save(); renderGrille();
+}
+$('n_dec').onclick = () => setN((+S.g.n || 1) - 1);
+$('n_inc').onclick = () => setN((+S.g.n || 1) + 1);
+$('g_n').addEventListener('input', () => { if (+$('g_n').value >= 1) { S.g.n = Math.floor(+$('g_n').value); save(); renderGrille(); } });
+$('g_n').addEventListener('blur', () => setN(+$('g_n').value));
 
 /* ── 設定ダイアログ ── */
 let M = null; // { grp, sel }
