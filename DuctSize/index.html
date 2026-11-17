@@ -65,6 +65,9 @@ select{font-family:var(--sans);font-size:.78rem}
 .gear{width:40px;padding:5px 0;border:1.5px solid var(--bd);border-radius:7px;background:var(--sf2);font-size:1rem;cursor:pointer;color:var(--tx2)}
 .gear.on{border-color:var(--accent);color:var(--accent);background:var(--accent-l)}
 .sgrid[hidden]{display:none}
+.lrow{display:flex;align-items:flex-end;gap:4px}.lrow label{flex:1}.lrow .btn{padding:6px 8px}
+.pbtns{display:flex;align-items:center;gap:4px;flex-wrap:wrap;border-top:1px dashed var(--bd);padding-top:6px}
+.pbtns span{font-size:.64rem;color:var(--tx3);margin-right:2px}
 .ver a{color:var(--tx3)}
 .ver{text-align:center;font-size:.62rem;color:var(--tx3);font-family:var(--mono);margin-top:6px}
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--tx);color:#fff;font-size:.78rem;padding:8px 14px;border-radius:20px;opacity:0;transition:opacity .2s;pointer-events:none}
@@ -105,12 +108,13 @@ select{font-family:var(--sans);font-size:.78rem}
   <div class="sgrid only-d" hidden>
     <label>摩擦損失 上限 [Pa/m]<input id="d_R" class="num" type="number" step="0.1" inputmode="decimal" placeholder="制限なし"></label>
     <label>風速 上限 [m/s]<input id="d_V" class="num" type="number" step="0.5" inputmode="decimal" placeholder="制限なし"></label>
-    <label class="full">材質<select id="d_mat"></select></label>
+    <div class="full lrow"><label>材質<select id="d_mat"></select></label><button class="btn" id="mat_add">＋追加</button><button class="btn" id="mat_del">削除</button></div>
     <label>高さ 上限 [mm]<input id="d_Hmax" class="num" type="number" step="50" inputmode="numeric" placeholder="なし"></label>
     <label>アスペクト比 上限<input id="d_asp" class="num" type="number" step="0.5" inputmode="decimal"></label>
     <label>角ダクト 刻み [mm]<select id="d_step"><option>25</option><option>50</option><option>100</option></select></label>
     <label>丸ダクト 刻み [mm]<select id="d_rstep"><option>25</option><option>50</option></select></label>
     <label class="full">保温厚 [mm]<select id="d_ins"><option value="0">なし</option><option>25</option><option>40</option><option>50</option></select></label>
+    <div class="full pbtns"><span>種類</span><button class="btn" data-pa="d">＋現在値で追加</button><button class="btn" data-pu="d">上書き</button><button class="btn" data-pd="d">削除</button></div>
   </div>
   <div class="sgrid only-g" hidden>
     <label>開口率 [%]<input id="g_ratio" class="num" type="number" step="1" inputmode="decimal"></label>
@@ -119,6 +123,10 @@ select{font-family:var(--sans);font-size:.78rem}
     <label>刻み [mm]<select id="g_step"><option>25</option><option>50</option><option>100</option></select></label>
     <label>高さ 上限 [mm]<input id="g_Hmax" class="num" type="number" step="50" inputmode="numeric" placeholder="なし"></label>
     <label>アスペクト比 上限<input id="g_asp" class="num" type="number" step="0.5" inputmode="decimal"></label>
+    <div class="full pbtns"><span>種類</span><button class="btn" data-pa="g">＋現在値で追加</button><button class="btn" data-pu="g">上書き</button><button class="btn" data-pd="g">削除</button></div>
+  </div>
+  <div class="sgrid" hidden>
+    <div class="full pbtns"><span>設定</span><button class="btn" id="exp">書き出し</button><button class="btn" id="imp">読み込み</button><button class="btn" id="rst">初期化</button><input type="file" id="impf" accept=".json,application/json" hidden></div>
   </div>
 </div>
 
@@ -180,7 +188,7 @@ select{font-family:var(--sans);font-size:.78rem}
       <tbody id="m_mat"></tbody>
     </table>
     <h3>入力</h3>
-    風量欄は四則演算に対応します（例 <code>1200*3+800</code>）。候補をタップすると下段の特性に反映します。設定はブラウザに保存されます。
+    風量欄は四則演算に対応します（例 <code>1200*3+800</code>）。候補をタップすると下段の特性に反映します。設定・追加した種類／材質はブラウザに保存されます（⚙ の「書き出し」で JSON に保存、「読み込み」で復元）。
   </div>
 </div>
 
@@ -189,30 +197,28 @@ select{font-family:var(--sans);font-size:.78rem}
 <div class="toast" id="toast"></div>
 
 <script>
-const APP_VERSION = 'v01_2026-11-18.3';
+const APP_VERSION = 'v02_2026-11-18';
 document.querySelectorAll('.app-ver').forEach(el => el.textContent = APP_VERSION);
 
 const RHO = 1.2, NU = 15.1e-6;
-const MATS = [
+const DEF_MATS = [
   { id: 'gi',   name: '亜鉛鉄板',             e: 0.18 },
   { id: 'sus',  name: 'ステンレス',           e: 0.05 },
   { id: 'pvc',  name: '塩ビ',                 e: 0.01 },
   { id: 'gw',   name: 'グラスウールダクト',   e: 0.9  },
   { id: 'flex', name: 'フレキシブル（伸長）', e: 3.0  },
 ];
-const D_PRESETS = [
-  { name: '標準（低速）ダクト', R: 1.0, V: 10 },
-  { name: '低騒音（居室系）',   R: 0.8, V: 6  },
-  { name: '高速ダクト',         R: 3.0, V: 20 },
-  { name: '排煙ダクト',         R: '',  V: 20 },
-  { name: 'カスタム',           custom: true },
+const DEF_D_PRESETS = [
+  { name: '標準（低速）ダクト', R: 1.0, V: 10, mat: 'gi' },
+  { name: '低騒音（居室系）',   R: 0.8, V: 6,  mat: 'gi' },
+  { name: '高速ダクト',         R: 3.0, V: 20, mat: 'gi' },
+  { name: '排煙ダクト',         R: '',  V: 20, mat: 'gi' },
 ];
-const G_PRESETS = [
+const DEF_G_PRESETS = [
   { name: 'OA/EA ガラリ - 35% - 2.5m/s', ratio: 35, V: 2.5 },
   { name: 'OA/EA ガラリ - 35% - 3.0m/s', ratio: 35, V: 3.0 },
   { name: '吹出口 VHS - 70% - 3.0m/s',   ratio: 70, V: 3.0 },
   { name: '吸込口 HS - 70% - 2.0m/s',    ratio: 70, V: 2.0 },
-  { name: 'カスタム',                    custom: true },
 ];
 const MAX_CANDS = 15;
 
@@ -221,15 +227,22 @@ const fmt = (v, d) => (v == null || !isFinite(v)) ? '—' : v.toFixed(d);
 const fmtN = v => (v == null || !isFinite(v)) ? '—' : Math.round(v).toLocaleString();
 
 /* ── 保存 ── */
+const clone = o => JSON.parse(JSON.stringify(o));
 const DEF = {
   q: '5000', unit: 'h', tab: 'duct',
+  mats: DEF_MATS, dPresets: DEF_D_PRESETS, gPresets: DEF_G_PRESETS,
   d: { preset: 0, R: 1.0, V: 10, mat: 'gi', Hmax: '', asp: 4, step: 50, rstep: 25, ins: 0 },
   g: { preset: 0, ratio: 35, V: 2.5, n: 1, Hmax: '', asp: 4, step: 50 },
 };
 let S;
 try { S = JSON.parse(localStorage.getItem('ductsize') || 'null'); } catch (e) { S = null; }
-S = Object.assign({}, DEF, S || {});
-S.d = Object.assign({}, DEF.d, S.d); S.g = Object.assign({}, DEF.g, S.g);
+function normalize(o) {
+  o = Object.assign(clone(DEF), o || {});
+  o.d = Object.assign(clone(DEF.d), o.d); o.g = Object.assign(clone(DEF.g), o.g);
+  ['mats', 'dPresets', 'gPresets'].forEach(k => { if (!Array.isArray(o[k]) || !o[k].length) o[k] = clone(DEF[k]); });
+  return o;
+}
+S = normalize(S);
 const save = () => { try { localStorage.setItem('ductsize', JSON.stringify(S)); } catch (e) {} };
 
 /* ── 風量 ── */
@@ -263,7 +276,7 @@ function bisect(f, lo, hi) { // f 単調増加、f(x)=0
 const num = v => (v === '' || v == null || !isFinite(+v) || +v <= 0) ? null : +v;
 
 function ductLimits() {
-  const mat = MATS.find(m => m.id === S.d.mat) || MATS[0];
+  const mat = S.mats.find(m => m.id === S.d.mat) || S.mats[0];
   return { R: num(S.d.R), V: num(S.d.V), e: mat.e, mat };
 }
 function ductCheck(Q, W, H, L) { // W,H mm（H=null で丸）
@@ -357,11 +370,10 @@ function resHTML(items) {
 }
 
 function renderDuct() {
-  const p = D_PRESETS[S.d.preset];
   const L = ductLimits();
   $('d_summary').textContent =
     `Setting: 摩擦損失 ${L.R ? L.R.toFixed(1) + ' Pa/m' : '—'} , 風速 ${L.V ? L.V.toFixed(1) + ' m/s' : '—'}` +
-    (L.mat.id !== 'gi' ? ` , ${L.mat.name}` : '') + (num(S.d.Hmax) ? ` , H≤${S.d.Hmax}` : '');
+    (L.mat.id !== S.mats[0].id ? ` , ${L.mat.name}` : '') + (num(S.d.Hmax) ? ` , H≤${S.d.Hmax}` : '');
   const Q = getQ();
   const note = $('d_note');
   if (!(Q > 0)) { $('d_cands').innerHTML = ''; note.textContent = '風量を入力してください'; note.className = 'note warn'; dCandCache = []; renderDuctRes(); return; }
@@ -462,37 +474,128 @@ $('d_copy1').onclick = () => copy(qText() + '\nサイズ\t' + $('d_W').value + (
 $('g_copy1').onclick = () => copy(qText() + '\nサイズ\t' + $('g_W').value + ($('g_H').value ? 'x' + $('g_H').value : 'φ') + '\n' + resTSV($('g_res')));
 
 /* ── 初期化・イベント ── */
-D_PRESETS.forEach((p, i) => $('d_preset').add(new Option(p.name, i)));
-G_PRESETS.forEach((p, i) => $('g_preset').add(new Option(p.name, i)));
-MATS.forEach(m => $('d_mat').add(new Option(`${m.name}（ε=${m.e}mm）`, m.id)));
-$('m_mat').innerHTML = MATS.map(m => `<tr><td>${m.name}</td><td>${m.e}</td></tr>`).join('');
-
+const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+function fillSelects() {
+  const fill = (el, items, custom) => {
+    el.innerHTML = '';
+    items.forEach(([v, t]) => el.add(new Option(t, v)));
+    if (custom) el.add(new Option('（カスタム）', -1));
+  };
+  fill($('d_preset'), S.dPresets.map((p, i) => [i, p.name]), true);
+  fill($('g_preset'), S.gPresets.map((p, i) => [i, p.name]), true);
+  fill($('d_mat'), S.mats.map(m => [m.id, `${m.name}（ε=${m.e}mm）`]));
+  $('m_mat').innerHTML = S.mats.map(m => `<tr><td>${esc(m.name)}</td><td>${m.e}</td></tr>`).join('');
+}
 const bind = [
   ['d_preset', 'd', 'preset'], ['d_R', 'd', 'R'], ['d_V', 'd', 'V'], ['d_mat', 'd', 'mat'], ['d_Hmax', 'd', 'Hmax'],
   ['d_asp', 'd', 'asp'], ['d_step', 'd', 'step'], ['d_rstep', 'd', 'rstep'], ['d_ins', 'd', 'ins'],
   ['g_preset', 'g', 'preset'], ['g_ratio', 'g', 'ratio'], ['g_V', 'g', 'V'], ['g_n', 'g', 'n'], ['g_Hmax', 'g', 'Hmax'],
   ['g_asp', 'g', 'asp'], ['g_step', 'g', 'step'],
 ];
-bind.forEach(([id, grp, key]) => { $(id).value = S[grp][key]; });
-$('q').value = S.q; $('unit').value = S.unit;
+function loadUI() {
+  fillSelects();
+  if (!S.dPresets[S.d.preset]) S.d.preset = -1;
+  if (!S.gPresets[S.g.preset]) S.g.preset = -1;
+  if (!S.mats.some(m => m.id === S.d.mat)) S.d.mat = S.mats[0].id;
+  bind.forEach(([id, grp, key]) => { $(id).value = S[grp][key]; });
+  $('q').value = S.q; $('unit').value = S.unit;
+}
+loadUI();
 
 bind.forEach(([id, grp, key]) => {
   $(id).addEventListener(id.endsWith('preset') ? 'change' : 'input', () => {
     S[grp][key] = $(id).value;
     if (key === 'preset') {
-      const p = (grp === 'd' ? D_PRESETS : G_PRESETS)[+$(id).value];
-      if (!p.custom) {
-        if (grp === 'd') { S.d.R = p.R; S.d.V = p.V; $('d_R').value = p.R; $('d_V').value = p.V; }
-        else { S.g.ratio = p.ratio; S.g.V = p.V; $('g_ratio').value = p.ratio; $('g_V').value = p.V; }
-      }
-    } else if (['R', 'V', 'ratio'].includes(key)) {
-      const ps = grp === 'd' ? D_PRESETS : G_PRESETS;
-      const ci = ps.findIndex(p => p.custom);
-      S[grp].preset = ci; $(grp + '_preset').value = ci;
+      S[grp].preset = +$(id).value;
+      const p = presets(grp)[S[grp].preset];
+      if (p) applyPreset(grp, p);
+    } else if (['R', 'V', 'ratio', 'mat'].includes(key)) {
+      S[grp].preset = -1; $(grp + '_preset').value = -1;
     }
     save(); renderAll();
   });
 });
+const presets = grp => grp === 'd' ? S.dPresets : S.gPresets;
+const PKEYS = { d: ['R', 'V', 'mat'], g: ['ratio', 'V'] };
+function applyPreset(grp, p) {
+  PKEYS[grp].forEach(k => { if (p[k] !== undefined) { S[grp][k] = p[k]; $(grp + '_' + k).value = p[k]; } });
+  if (grp === 'd' && !S.mats.some(m => m.id === S.d.mat)) { S.d.mat = S.mats[0].id; $('d_mat').value = S.d.mat; }
+}
+const curPreset = grp => Object.fromEntries(PKEYS[grp].map(k => [k, S[grp][k]]));
+function afterChange() { save(); loadUI(); renderAll(); }
+document.querySelectorAll('[data-pa]').forEach(b => b.onclick = () => {
+  const grp = b.dataset.pa;
+  const name = (prompt('種類の名前（現在の設定値で追加）', '') || '').trim();
+  if (!name) return;
+  presets(grp).push(Object.assign({ name }, curPreset(grp)));
+  S[grp].preset = presets(grp).length - 1;
+  afterChange(); toast('追加しました');
+});
+document.querySelectorAll('[data-pu]').forEach(b => b.onclick = () => {
+  const grp = b.dataset.pu, list = presets(grp);
+  let idx = +S[grp].preset;
+  if (!list[idx]) {
+    const names = list.map((p, k) => `${k + 1}: ${p.name}`).join('\n');
+    idx = parseInt(prompt('上書きする種類の番号\n' + names, ''), 10) - 1;
+    if (!list[idx]) return;
+  }
+  if (!confirm(`「${list[idx].name}」を現在の設定値で上書きしますか？`)) return;
+  Object.assign(list[idx], curPreset(grp));
+  S[grp].preset = idx;
+  afterChange(); toast('上書きしました');
+});
+document.querySelectorAll('[data-pd]').forEach(b => b.onclick = () => {
+  const grp = b.dataset.pd, list = presets(grp), i = +S[grp].preset;
+  if (!list[i]) { toast('削除する種類を選択してください'); return; }
+  if (list.length <= 1) { toast('最後の1件は削除できません'); return; }
+  if (!confirm(`「${list[i].name}」を削除しますか？`)) return;
+  list.splice(i, 1); S[grp].preset = -1;
+  afterChange(); toast('削除しました');
+});
+$('mat_add').onclick = () => {
+  const name = (prompt('材質の名前', '') || '').trim();
+  if (!name) return;
+  const e = parseFloat(prompt('粗さ ε [mm]', '0.18'));
+  if (!(e >= 0)) { toast('ε の値が不正です'); return; }
+  const id = 'm' + Date.now();
+  S.mats.push({ id, name, e }); S.d.mat = id; S.d.preset = -1;
+  afterChange(); toast('追加しました');
+};
+$('mat_del').onclick = () => {
+  const i = S.mats.findIndex(m => m.id === S.d.mat);
+  if (S.mats.length <= 1) { toast('最後の1件は削除できません'); return; }
+  if (!confirm(`材質「${S.mats[i].name}」を削除しますか？`)) return;
+  S.mats.splice(i, 1); S.d.mat = S.mats[0].id; S.d.preset = -1;
+  afterChange(); toast('削除しました');
+};
+$('exp').onclick = () => {
+  const data = Object.assign({ app: 'DuctSize', version: APP_VERSION }, S);
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  const d = new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10);
+  a.href = URL.createObjectURL(blob); a.download = `ductsize-settings_${d}.json`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+};
+$('imp').onclick = () => $('impf').click();
+$('impf').onchange = async () => {
+  const f = $('impf').files[0]; $('impf').value = '';
+  if (!f) return;
+  let o;
+  try { o = JSON.parse(await f.text()); } catch (e) { o = null; }
+  if (!o || o.app !== 'DuctSize') { toast('読み込めないファイルです'); return; }
+  if (!confirm('現在の設定を読み込んだ内容で置き換えますか？')) return;
+  delete o.app; delete o.version;
+  const tab = S.tab;
+  S = normalize(o); S.tab = tab;
+  afterChange(); toast('読み込みました');
+};
+$('rst').onclick = () => {
+  if (!confirm('種類・材質・設定をすべて初期状態に戻しますか？')) return;
+  const tab = S.tab;
+  S = normalize(null); S.tab = tab;
+  afterChange(); toast('初期化しました');
+};
 $('q').addEventListener('input', () => { S.q = $('q').value; save(); renderAll(); });
 $('q').addEventListener('blur', () => { const v = evalExpr(S.q); if (v > 0 && /[+\-*/()×÷]/.test(S.q)) { S.q = String(+v.toFixed(2)); $('q').value = S.q; save(); } });
 $('unit').addEventListener('change', () => {
