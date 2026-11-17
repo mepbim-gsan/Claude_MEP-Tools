@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IFC Viewer</title>
+<style>
+:root{
+  --bg:#f3f4f6; --panel:#ffffff; --border:#d9dde3; --text:#1c2128; --sub:#6b7280;
+  --accent:#1a3a6b; --accent-soft:#e3e9f3; --hover:#eef1f5; --view:#e9ecf0; --warn:#b45309;
+  --add:#16a34a; --del:#dc2626; --chg:#ea8a0c;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#15181d; --panel:#1d2128; --border:#323844; --text:#e6e8eb; --sub:#9aa3af;
+    --accent:#8fb0e6; --accent-soft:#25324a; --hover:#262c36; --view:#22262d; --warn:#f59e0b;
+  }
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Hiragino Sans","Yu Gothic UI","Yu Gothic",sans-serif;font-size:13px;color:var(--text);background:var(--bg);display:flex;flex-direction:column;overflow:hidden}
+button,select,input{font:inherit;color:inherit}
+button{background:var(--panel);border:1px solid var(--border);border-radius:6px;padding:4px 10px;cursor:pointer;white-space:nowrap}
+button:hover{background:var(--hover)}
+button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+button.on{background:var(--accent-soft);border-color:var(--accent);color:var(--accent);font-weight:600}
+button:disabled{opacity:.45;cursor:default}
+select,input[type=text],input[type=number]{background:var(--panel);border:1px solid var(--border);border-radius:6px;padding:3px 6px;height:28px}
+input[type=number]{width:62px}
+header{display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--panel);border-bottom:1px solid var(--border);flex-wrap:wrap}
+header h1{font-size:14px;margin:0 6px 0 0;color:var(--accent)}
+header .sep{width:1px;height:22px;background:var(--border)}
+header .grow{flex:1}
+.app-ver{color:var(--sub);font-size:11px}
+#main{flex:1;display:flex;min-height:0}
+aside{width:290px;background:var(--panel);border-right:1px solid var(--border);display:flex;flex-direction:column;min-height:0}
+aside.right{border-right:none;border-left:1px solid var(--border);width:330px}
+.tabs{display:flex;border-bottom:1px solid var(--border)}
+.tabs button{flex:1;border:none;border-radius:0;border-bottom:2px solid transparent;background:none;padding:7px 4px}
+.tabs button.on{border-bottom-color:var(--accent);color:var(--accent);background:none}
+.pane{flex:1;overflow:auto;padding:8px;display:none;min-height:0}
+.pane.on{display:block}
+.row{display:flex;align-items:center;gap:6px;margin:4px 0;flex-wrap:wrap}
+.row label{color:var(--sub)}
+.hint{color:var(--sub);font-size:12px;margin:4px 0}
+.list{border:1px solid var(--border);border-radius:6px;margin-top:6px}
+.item{display:flex;align-items:center;gap:6px;padding:4px 6px;border-bottom:1px solid var(--border)}
+.item:last-child{border-bottom:none}
+.item:hover{background:var(--hover)}
+.item .name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer}
+.item .cnt{color:var(--sub);font-size:11px;white-space:nowrap}
+.sw{width:12px;height:12px;border-radius:3px;flex:none;border:1px solid rgba(0,0,0,.2)}
+.model{border:1px solid var(--border);border-radius:8px;padding:6px 8px;margin-bottom:6px}
+.model .t{display:flex;align-items:center;gap:6px}
+.model .t b{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.model .meta{color:var(--sub);font-size:11px;margin-top:3px;line-height:1.5}
+.x{border:none;background:none;padding:0 4px;color:var(--sub)}
+.badge{display:inline-block;min-width:18px;padding:0 5px;border-radius:9px;background:var(--accent-soft);color:var(--accent);font-size:11px;text-align:center}
+#center{flex:1;display:flex;flex-direction:column;min-width:0}
+#viewport{flex:1;position:relative;background:var(--view);min-height:0;overflow:hidden}
+#viewport canvas{display:block}
+#labels{position:absolute;inset:0;pointer-events:none}
+.rlabel{font-size:11px;line-height:1.25;text-align:center;color:#111;background:rgba(255,255,255,.82);border:1px solid rgba(0,0,0,.18);border-radius:4px;padding:1px 4px;white-space:nowrap}
+.rlabel small{display:block;color:#444;font-size:10px}
+#drop{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:8px;color:var(--sub);pointer-events:none;text-align:center}
+#drop b{font-size:16px;color:var(--text)}
+#viewport.dragover{outline:3px dashed var(--accent);outline-offset:-6px}
+#legend{position:absolute;left:8px;bottom:8px;max-height:45%;overflow:auto;background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:6px 8px;font-size:12px;display:none;max-width:280px}
+#legend .li{display:flex;gap:6px;align-items:center;cursor:pointer;padding:1px 0}
+#legend .li span:last-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#planbar{position:absolute;right:8px;top:8px;background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:4px 8px;font-size:12px;display:none}
+#busy{position:absolute;inset:0;background:rgba(0,0,0,.35);display:none;align-items:center;justify-content:center;z-index:10}
+#busy .box{background:var(--panel);border-radius:10px;padding:16px 20px;min-width:300px}
+#busy .bar{height:6px;background:var(--border);border-radius:3px;overflow:hidden;margin-top:10px}
+#busy .bar i{display:block;height:100%;width:0;background:var(--accent)}
+#bottom{height:300px;background:var(--panel);border-top:1px solid var(--border);display:flex;flex-direction:column;min-height:0}
+#bottom.closed{height:auto}
+#bottom.closed .bbody{display:none}
+#resizer{height:5px;cursor:ns-resize;background:var(--border)}
+.btabs{display:flex;align-items:center;gap:4px;padding:4px 8px;border-bottom:1px solid var(--border)}
+.btabs .grow{flex:1}
+.bbody{flex:1;min-height:0;display:flex;flex-direction:column}
+.bpane{display:none;flex:1;min-height:0;flex-direction:column}
+.bpane.on{display:flex}
+.tools{display:flex;gap:6px;align-items:center;padding:6px 8px;flex-wrap:wrap}
+.tablewrap{flex:1;overflow:auto;min-height:0;border-top:1px solid var(--border)}
+table{border-collapse:collapse;width:max-content;min-width:100%}
+th,td{border-bottom:1px solid var(--border);border-right:1px solid var(--border);padding:3px 8px;text-align:left;white-space:nowrap;max-width:360px;overflow:hidden;text-overflow:ellipsis}
+th{position:sticky;top:0;background:var(--panel);z-index:1;cursor:pointer;user-select:none;font-weight:600}
+th .rm{color:var(--sub);margin-left:6px}
+tbody tr:hover{background:var(--hover)}
+tbody tr.sel{background:var(--accent-soft)}
+td.num{text-align:right}
+td.click{cursor:pointer;color:var(--accent)}
+.st-add{color:var(--add);font-weight:600}.st-del{color:var(--del);font-weight:600}.st-chg{color:var(--chg);font-weight:600}
+#props{flex:1;overflow:auto;padding:8px}
+.psec{margin-bottom:8px;border:1px solid var(--border);border-radius:6px}
+.psec>div:first-child{padding:4px 8px;background:var(--hover);font-weight:600;cursor:pointer;border-radius:6px 6px 0 0}
+.psec table{width:100%;min-width:0;table-layout:fixed}
+.psec td{white-space:normal;word-break:break-all;max-width:none;font-size:12px}
+.psec td:first-child{color:var(--sub);width:42%}
+.psec.closed table{display:none}
+.chip{display:inline-block;padding:1px 8px;border-radius:10px;border:1px solid var(--border);margin-right:4px}
+.muted{color:var(--sub)}
+</style>
+</head>
+<body>
+<header>
+  <h1>IFC Viewer</h1>
+  <button class="primary" id="btnOpen">IFCを開く</button>
+  <input type="file" id="file" accept=".ifc" multiple hidden>
+  <span class="sep"></span>
+  <button id="btn3d" class="on">3D</button>
+  <button id="btn2d">2D平面</button>
+  <span class="sep"></span>
+  <button id="btnFit" title="F">全体表示</button>
+  <button id="btnZoomSel">選択にズーム</button>
+  <button id="btnIsolate">選択のみ表示</button>
+  <button id="btnUnisolate">分離解除</button>
+  <span class="sep"></span>
+  <label class="muted">色分け</label>
+  <select id="colorMode">
+    <option value="original">元の色</option>
+    <option value="model">モデル別</option>
+    <option value="class">IFCクラス別</option>
+    <option value="system">系統別</option>
+    <option value="storey">階別</option>
+    <option value="property">プロパティ値別…</option>
+    <option value="diff" disabled>差分</option>
+  </select>
+  <input type="text" id="colorKey" list="keyList" placeholder="プロパティを選択" style="width:220px;display:none">
+  <span class="grow"></span>
+  <span class="app-ver"></span>
+</header>
+<datalist id="keyList"></datalist>
+<div id="main">
+  <aside>
+    <div class="tabs" id="ltabs">
+      <button data-p="pModels" class="on">モデル</button>
+      <button data-p="pLevels">階・2D</button>
+      <button data-p="pSystems">系統</button>
+      <button data-p="pClasses">分類</button>
+    </div>
+    <div class="pane on" id="pModels">
+      <div id="modelList"></div>
+      <div class="hint">IFCファイルを画面にドラッグ＆ドロップしても読み込めます。複数のモデルを重ねて表示できます。</div>
+    </div>
+    <div class="pane" id="pLevels">
+      <div class="row"><label>階</label><select id="levelSel" style="flex:1"></select></div>
+      <div class="row"><label>表示範囲 床から</label><input type="number" id="cutLow" step="0.1" value="-0.1"><label>〜</label><input type="number" id="cutHigh" step="0.1" value="1.5"><label>m</label></div>
+      <div class="row"><label><input type="checkbox" id="spaceFill" checked> 部屋を塗る</label><label><input type="checkbox" id="spaceLabel" checked> 部屋名を表示</label></div>
+      <div class="row"><label>部屋名</label><select id="labelMode"><option value="both">番号＋名称</option><option value="long">名称（LongName）</option><option value="name">番号（Name）</option></select></div>
+      <div class="row"><label>2行目</label><input type="text" id="labelKey" list="keyList" placeholder="例: 面積のプロパティ" style="flex:1"></div>
+      <div class="row"><label><input type="checkbox" id="clip3d"> 3Dでもこの階で切断</label></div>
+      <div class="hint">2D平面では、選択した階の床から指定した高さの範囲を真上から表示します。天井内の設備を見るときは上端を大きくし、「分類」タブで天井（IfcCovering）を非表示にしてください。</div>
+      <div class="list" id="levelList"></div>
+    </div>
+    <div class="pane" id="pSystems">
+      <div class="row"><label>系統の判定キー</label></div>
+      <div class="row"><input type="text" id="sysKey" list="keyList" style="flex:1"></div>
+      <div class="row"><input type="text" id="sysFilter" placeholder="系統名で絞り込み" style="flex:1"></div>
+      <div class="row"><button id="sysAll">すべて表示</button><button id="sysNone">すべて非表示</button><button id="sysColor">系統で色分け</button></div>
+      <div class="hint">系統名をクリックすると、その系統の要素を選択します。チェックを外すと非表示になります。</div>
+      <div class="list" id="sysList"></div>
+    </div>
+    <div class="pane" id="pClasses">
+      <div class="row"><input type="text" id="clsFilter" placeholder="クラス名で絞り込み" style="flex:1"></div>
+      <div class="row"><button id="clsAll">すべて表示</button><button id="clsNone">すべて非表示</button></div>
+      <div class="list" id="clsList"></div>
+    </div>
+  </aside>
+  <div id="center">
+    <div id="viewport">
+      <div id="labels"></div>
+      <div id="drop"><b>IFCファイルをここにドロップ</b><span>または「IFCを開く」から選択（複数選択可）</span><span>左ドラッグ: 回転 ／ 右ドラッグ: パン ／ ホイール: ズーム ／ クリック: 選択</span></div>
+      <div id="legend"></div>
+      <div id="planbar"></div>
+      <div id="busy"><div class="box"><div id="busyMsg">読み込み中…</div><div class="bar"><i id="busyBar"></i></div></div></div>
+    </div>
+    <div id="resizer"></div>
+    <div id="bottom">
+      <div class="btabs" id="btabs">
+        <button data-p="bList" class="on">一覧</button>
+        <button data-p="bPivot">集計</button>
+        <button data-p="bDiff">差分</button>
+        <span class="grow"></span>
+        <button id="btnBottom">▼ 閉じる</button>
+      </div>
+      <div class="bbody">
+        <div class="bpane on" id="bList">
+          <div class="tools">
+            <select id="listScope"><option value="visible">表示中の要素</option><option value="all">全要素</option><option value="selected">選択中の要素</option></select>
+            <select id="listModel"></select>
+            <select id="listClass"></select>
+            <input type="text" id="listFilter" placeholder="文字で絞り込み" style="width:160px">
+            <input type="text" id="listAddCol" list="keyList" placeholder="列を追加（プロパティ名）" style="width:240px">
+            <button id="listSelect">一覧の要素を選択</button>
+            <button id="listCsv">CSV出力</button>
+            <span id="listInfo" class="muted"></span>
+          </div>
+          <div class="tablewrap"><table id="listTable"></table></div>
+        </div>
+        <div class="bpane" id="bPivot">
+          <div class="tools">
+            <label class="muted">行</label><input type="text" id="pivRow" list="keyList" style="width:220px">
+            <label class="muted">値</label><select id="pivAgg"><option value="count">件数</option><option value="sum">合計</option></select>
+            <input type="text" id="pivVal" list="keyList" placeholder="合計するプロパティ" style="width:220px;display:none">
+            <select id="pivScope"><option value="all">全要素</option><option value="visible">表示中の要素</option></select>
+            <button id="pivCsv">CSV出力</button>
+            <span class="muted">列はモデルごと。セルをクリックすると該当要素を選択します。</span>
+          </div>
+          <div class="tablewrap"><table id="pivTable"></table></div>
+        </div>
+        <div class="bpane" id="bDiff">
+          <div class="tools">
+            <label class="muted">旧</label><select id="diffA"></select>
+            <label class="muted">新</label><select id="diffB"></select>
+            <select id="diffScope"><option value="all">全プロパティを比較</option><option value="cols">一覧の列だけ比較</option></select>
+            <button class="primary" id="diffRun">比較</button>
+            <button id="diffColor" disabled>3Dに色表示</button>
+            <select id="diffFilter"><option value="">すべて</option><option value="add">追加</option><option value="del">削除</option><option value="chg">変更</option></select>
+            <button id="diffCsv" disabled>CSV出力</button>
+            <span id="diffInfo" class="muted">GlobalId で要素を対応付けて比較します。</span>
+          </div>
+          <div class="tablewrap"><table id="diffTable"></table></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <aside class="right">
+    <div class="tabs"><button class="on">プロパティ</button></div>
+    <div id="props"><div class="hint">要素をクリックするとプロパティを表示します。</div></div>
+  </aside>
+</div>
+<script type="application/octet-stream" id="wasm-b64">/*__WASM__*/</script>
+<script>/*__BUNDLE__*/</script>
+</body>
+</html>
