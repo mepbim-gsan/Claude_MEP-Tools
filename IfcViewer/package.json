@@ -1,0 +1,7 @@
+{
+  "name": "ifc-viewer",
+  "private": true,
+  "type": "module",
+  "scripts": { "build": "node build.mjs" },
+  "devDependencies": { "esbuild": "0.28.2", "three": "0.187.0", "web-ifc": "0.0.79" }
+}
