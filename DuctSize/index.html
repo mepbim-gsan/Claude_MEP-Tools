@@ -16,56 +16,56 @@
   --r:10px;--sh:0 2px 12px rgba(30,60,120,.09);
 }
 *{box-sizing:border-box;margin:0;padding:0}
-body{background:var(--bg);color:var(--tx);font-family:var(--sans);min-height:100vh;padding:16px 6px 48px}
-header{text-align:center;margin-bottom:14px}
-header h1{font-size:1.15rem;font-weight:700;color:var(--accent);letter-spacing:.05em}
-header p{font-size:.7rem;color:var(--tx3);margin-top:3px;font-family:var(--mono)}
+body{background:var(--bg);color:var(--tx);font-family:var(--sans);min-height:100vh;padding:8px 6px 24px}
+header{display:flex;align-items:baseline;justify-content:center;gap:8px;margin-bottom:6px}
+header h1{font-size:1rem;font-weight:700;color:var(--accent);letter-spacing:.05em}
+header p{font-size:.62rem;color:var(--tx3);font-family:var(--mono)}
 .wrap{max-width:600px;margin:0 auto}
-.tabs{display:flex;gap:3px;padding:3px;background:var(--surface);border:1px solid var(--bd);border-radius:var(--r);margin-bottom:10px}
-.tab-btn{flex:1;padding:9px 4px;border:none;background:transparent;border-radius:7px;font-family:var(--sans);font-size:.8rem;font-weight:500;color:var(--tx3);cursor:pointer}
+.tabs{display:flex;gap:3px;padding:2px;background:var(--surface);border:1px solid var(--bd);border-radius:var(--r);margin-bottom:6px}
+.tab-btn{flex:1;padding:6px 4px;border:none;background:transparent;border-radius:7px;font-family:var(--sans);font-size:.76rem;font-weight:500;color:var(--tx3);cursor:pointer}
 .tab-btn.active{background:var(--accent);color:#fff}
-.card{background:var(--surface);border:1px solid var(--bd);border-radius:var(--r);padding:14px 12px;box-shadow:var(--sh);margin-bottom:10px}
-.card h2{font-size:.82rem;font-weight:700;color:var(--tx2);margin-bottom:10px;display:flex;align-items:center;gap:6px}
-.card h2 .sub{font-weight:400;color:var(--tx3);font-size:.7rem}
+.card{background:var(--surface);border:1px solid var(--bd);border-radius:var(--r);padding:8px 10px;box-shadow:var(--sh);margin-bottom:6px}
+.card h2{font-size:.76rem;font-weight:700;color:var(--tx2);margin-bottom:6px;display:flex;align-items:center;gap:6px}
+.card h2 .sub{font-weight:400;color:var(--tx3);font-size:.66rem}
 .card h2 .act{margin-left:auto}
 .panel{display:none}.panel.active{display:block}
-.row{display:flex;align-items:center;gap:8px}
-.row+.row{margin-top:8px}
-.lbl{font-size:.78rem;color:var(--tx2);white-space:nowrap;min-width:52px}
-input,select{font-family:var(--mono);font-size:.9rem;color:var(--tx);border:1.5px solid var(--bd);border-radius:7px;background:var(--surface);padding:9px 8px;outline:none;min-width:0}
+.row{display:flex;align-items:center;gap:6px}
+.row+.row{margin-top:6px}
+.lbl{font-size:.74rem;color:var(--tx2);white-space:nowrap;min-width:36px}
+input,select{font-family:var(--mono);font-size:.86rem;color:var(--tx);border:1.5px solid var(--bd);border-radius:7px;background:var(--surface);padding:6px 7px;outline:none;min-width:0}
 input:focus,select:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(26,111,196,.13)}
 input.num{text-align:right}
-#q{flex:1;font-size:1.15rem;font-weight:500}
-select{font-family:var(--sans);font-size:.82rem}
+#q{flex:1;font-size:1.05rem;font-weight:500}
+select{font-family:var(--sans);font-size:.78rem}
 .grow{flex:1}
-.summary{font-size:.72rem;color:var(--tx3);font-family:var(--mono);margin-top:8px;line-height:1.5}
-.btn{padding:6px 10px;border-radius:6px;border:1px solid var(--bd2);background:var(--sf2);color:var(--tx2);font-family:var(--sans);font-size:.74rem;cursor:pointer;white-space:nowrap}
+.summary{font-size:.64rem;color:var(--tx3);font-family:var(--mono);margin-top:4px;line-height:1.4}
+.btn{padding:3px 8px;border-radius:6px;border:1px solid var(--bd2);background:var(--sf2);color:var(--tx2);font-family:var(--sans);font-size:.68rem;cursor:pointer;white-space:nowrap}
 .btn:active{background:var(--accent);color:#fff}
-details.set{margin-top:8px;border-top:1px solid var(--bd);padding-top:8px}
-details.set summary{font-size:.76rem;color:var(--accent);cursor:pointer;list-style:none}
+details.set{margin-top:4px;border-top:1px solid var(--bd);padding-top:4px}
+details.set summary{font-size:.7rem;color:var(--accent);cursor:pointer;list-style:none}
 details.set summary::before{content:'⚙ '}
-.sgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px 10px;margin-top:10px}
-.sgrid label{display:flex;flex-direction:column;gap:3px;font-size:.7rem;color:var(--tx3)}
-.sgrid input,.sgrid select{width:100%;padding:7px 8px;font-size:.84rem}
+.sgrid{display:grid;grid-template-columns:1fr 1fr;gap:6px 8px;margin-top:6px}
+.sgrid label{display:flex;flex-direction:column;gap:2px;font-size:.64rem;color:var(--tx3)}
+.sgrid input,.sgrid select{width:100%;padding:5px 7px;font-size:.8rem}
 .sgrid .full{grid-column:1/-1}
-.cands{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
-.cand{padding:9px 2px;border:1.5px solid var(--bd);border-radius:7px;background:var(--sf2);text-align:center;font-family:var(--mono);font-size:.95rem;font-weight:500;cursor:pointer;line-height:1.2}
-.cand small{display:block;font-size:.6rem;color:var(--tx3);font-weight:400;font-family:var(--sans)}
+.cands{display:grid;grid-template-columns:repeat(3,1fr);gap:3px}
+.cand{padding:4px 2px;border:1px solid var(--bd);border-radius:6px;background:var(--sf2);text-align:center;font-family:var(--mono);font-size:.84rem;font-weight:500;cursor:pointer;line-height:1.3}
+.cand small{font-size:.56rem;color:var(--tx3);font-weight:400;font-family:var(--sans);margin-left:3px}
 .cand.calc{background:var(--surface);border-style:dashed;color:var(--tx2)}
 .cand.sel{border-color:var(--accent);background:var(--accent-l);color:var(--accent)}
 .cand.ng{border-color:#f5b7b1;background:var(--red-l)}
-.note{font-size:.7rem;color:var(--tx3);margin-top:8px;line-height:1.5}
+.note{font-size:.64rem;color:var(--tx3);margin-top:4px;line-height:1.4}
 .note.warn{color:var(--amber)}
-.size-in{display:flex;align-items:center;gap:6px;margin-bottom:12px}
-.size-in input{width:92px;text-align:right}
+.size-in{display:flex;align-items:center;gap:3px;font-weight:400}
+.size-in input{width:64px;text-align:right;padding:4px 6px;font-size:.82rem}
 .size-in span{font-family:var(--mono);color:var(--tx3)}
-.res{display:grid;grid-template-columns:1fr 1fr;gap:6px}
-.res div{background:var(--sf2);border-radius:7px;padding:7px 9px}
-.res .k{font-size:.66rem;color:var(--tx3)}
-.res .v{font-family:var(--mono);font-size:.98rem;font-weight:500;margin-top:1px}
+.res{display:grid;grid-template-columns:1fr 1fr;gap:0 12px}
+.res>div{display:flex;justify-content:space-between;align-items:baseline;gap:4px;padding:3px 0;border-bottom:1px dashed var(--bd)}
+.res .k{font-size:.64rem;color:var(--tx3);white-space:nowrap}
+.res .v{font-family:var(--mono);font-size:.84rem;font-weight:500;white-space:nowrap}
 .res .v.ok{color:var(--green)}.res .v.over{color:var(--red)}
 .res .full{grid-column:1/-1}
-.ver{text-align:center;font-size:.66rem;color:var(--tx3);font-family:var(--mono);margin-top:14px}
+.ver{text-align:center;font-size:.62rem;color:var(--tx3);font-family:var(--mono);margin-top:6px}
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--tx);color:#fff;font-size:.78rem;padding:8px 14px;border-radius:20px;opacity:0;transition:opacity .2s;pointer-events:none}
 .toast.show{opacity:.92}
 .manual{font-size:.78rem;line-height:1.7;color:var(--tx2)}
@@ -130,11 +130,10 @@ details.set summary::before{content:'⚙ '}
   </div>
 
   <div class="card">
-    <h2>選択ダクトの特性<button class="btn act" id="d_copy1">コピー</button></h2>
-    <div class="size-in">
-      <input id="d_W" type="number" inputmode="numeric" placeholder="W / φ"><span>×</span>
-      <input id="d_H" type="number" inputmode="numeric" placeholder="H（丸は空欄）">
-    </div>
+    <h2>選択ダクトの特性<span class="size-in">
+      <input id="d_W" type="number" inputmode="numeric" placeholder="W/φ"><span>×</span>
+      <input id="d_H" type="number" inputmode="numeric" placeholder="H">
+    </span><button class="btn act" id="d_copy1">コピー</button></h2>
     <div class="res" id="d_res"></div>
   </div>
 </div>
@@ -171,11 +170,10 @@ details.set summary::before{content:'⚙ '}
   </div>
 
   <div class="card">
-    <h2>吹出・吸込口の特性<button class="btn act" id="g_copy1">コピー</button></h2>
-    <div class="size-in">
-      <input id="g_W" type="number" inputmode="numeric" placeholder="W / φ"><span>×</span>
-      <input id="g_H" type="number" inputmode="numeric" placeholder="H（丸は空欄）">
-    </div>
+    <h2>吹出・吸込口の特性<span class="size-in">
+      <input id="g_W" type="number" inputmode="numeric" placeholder="W/φ"><span>×</span>
+      <input id="g_H" type="number" inputmode="numeric" placeholder="H">
+    </span><button class="btn act" id="g_copy1">コピー</button></h2>
     <div class="res" id="g_res"></div>
   </div>
 </div>
@@ -213,7 +211,7 @@ details.set summary::before{content:'⚙ '}
 <div class="toast" id="toast"></div>
 
 <script>
-const APP_VERSION = 'v01_2026-11-18';
+const APP_VERSION = 'v01_2026-11-18.2';
 document.querySelectorAll('.app-ver').forEach(el => el.textContent = APP_VERSION);
 
 const RHO = 1.2, NU = 15.1e-6;
@@ -413,7 +411,7 @@ function renderDuctRes() {
       ['風速 [m/s]', fmt(c.v, 2), L.V ? (c.v <= L.V ? 'ok' : 'over') : ''],
       ['摩擦損失 [Pa/m]', fmt(c.R, 3), L.R ? (c.R <= L.R ? 'ok' : 'over') : ''],
       ['動圧 [Pa]', fmt(RHO * c.v * c.v / 2, 1)],
-      ['丸ダクト換算時風速 [m/s]', H ? fmt(vRound, 2) : '—'],
+      ['丸換算風速 [m/s]', H ? fmt(vRound, 2) : '—'],
     );
   }
   items.push(
@@ -457,7 +455,7 @@ function renderGrilleRes() {
   ];
   if (Q > 0 && Ae) {
     const v = Q / n / 3600 / Ae;
-    items.splice(1, 0, ['面風速（有効開口）[m/s]', fmt(v, 2), Vs ? (v <= Vs ? 'ok' : 'over') : '']);
+    items.splice(1, 0, ['面風速 [m/s]', fmt(v, 2), Vs ? (v <= Vs ? 'ok' : 'over') : '']);
     items.push(['必要台数', Vs ? Math.ceil(Q / 3600 / (Ae * Vs) - 1e-9) + ' 台' : '—'],
                ['必要面積 [m²/台]', Vs ? fmt(Q / n / 3600 / Vs / (ratio / 100), 3) : '—']);
   }
