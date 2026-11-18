@@ -136,7 +136,7 @@ select{font-family:var(--sans);font-size:.78rem}
   </div>
 
   <div class="card">
-    <h2>選択ダクトの特性<span class="size-in">
+    <h2>選択ダクトの情報<span class="size-in">
       <input id="d_W" type="number" inputmode="numeric" placeholder="W/φ"><span>×</span>
       <input id="d_H" type="number" inputmode="numeric" placeholder="H">
     </span><button class="btn act" id="d_copy1">コピー</button></h2>
@@ -153,7 +153,7 @@ select{font-family:var(--sans);font-size:.78rem}
   </div>
 
   <div class="card">
-    <h2>吹出・吸込口の特性<span class="size-in">
+    <h2>吹出・吸込口の情報<span class="size-in">
       <input id="g_W" type="number" inputmode="numeric" placeholder="W/φ"><span>×</span>
       <input id="g_H" type="number" inputmode="numeric" placeholder="H">
     </span><button class="btn act" id="g_copy1">コピー</button></h2>
@@ -169,11 +169,12 @@ select{font-family:var(--sans);font-size:.78rem}
     <code>R = λ/D · ρv²/2</code>（Darcy–Weisbach）、λ は Colebrook 式（ρ=1.2 kg/m³、ν=15.1×10⁻⁶ m²/s）。<br>
     角ダクトは相当直径 <code>De = 1.30·(W·H)^0.625 / (W+H)^0.25</code> で摩擦損失を、実断面積で風速を判定します。<br>
     候補は幅の小さい順に、各幅で条件を満たす最小の高さを表示します（高さ上限・アスペクト比上限で絞り込み）。先頭の正方形は最小の正方形サイズです。
-    <h3>選択ダクトの特性</h3>
+    <h3>選択ダクトの情報</h3>
     <table>
       <tr><td>動圧</td><td><code>ρv²/2</code></td></tr>
       <tr><td>基準風量</td><td>設定条件（R・V 上限）を満たす最大風量</td></tr>
       <tr><td>丸ダクト換算時風速</td><td>相当直径 De の丸ダクトでの風速</td></tr>
+      <tr><td>基準風量比</td><td>風量 ÷ 基準風量（100% 超で条件超過）</td></tr>
       <tr><td>外形寸法</td><td>W+2t × H+2t（t=保温厚）</td></tr>
     </table>
     <h3>吹出・吸込口</h3>
@@ -185,7 +186,7 @@ select{font-family:var(--sans);font-size:.78rem}
       <tbody id="m_mat"></tbody>
     </table>
     <h3>入力</h3>
-    風量欄は四則演算に対応します（例 <code>1200*3+800</code>）。候補をタップすると下段の特性に反映します。設定・選定スタイルはブラウザに保存されます（⚙ の「書き出し」で JSON に保存、「読み込み」で復元）。
+    風量欄は四則演算に対応します（例 <code>1200*3+800</code>）。候補をタップすると下段の情報に反映します（未選択時は先頭の角サイズを自動表示）。設定・選定スタイルはブラウザに保存されます（⚙ の「書き出し」で JSON に保存、「読み込み」で復元）。
   </div>
 </div>
 
@@ -208,7 +209,7 @@ select{font-family:var(--sans);font-size:.78rem}
         <label>ダクト材質</label><select id="md_mat"></select>
         <label>内面粗度 [mm]</label><input id="md_e" class="num" type="number" step="0.01" inputmode="decimal">
         <label>最大ダクト内風速 [m/s]</label><input id="md_V" class="num" type="number" step="0.5" inputmode="decimal" placeholder="制限なし">
-        <label>摩擦損失 [Pa/m]</label><input id="md_R" class="num" type="number" step="0.1" inputmode="decimal" placeholder="制限なし">
+        <label id="md_Rlbl">摩擦損失 [Pa/m]</label><input id="md_R" class="num" type="number" step="0.1" inputmode="decimal" placeholder="制限なし">
         <label>アスペクト比</label><input id="md_asp" class="num" type="number" step="0.5" inputmode="decimal">
       </div>
       <div class="mgrid only-g">
@@ -223,6 +224,7 @@ select{font-family:var(--sans);font-size:.78rem}
         <label>高さ上限 [mm]</label><input id="md_Hmax" class="num" type="number" step="50" inputmode="numeric" placeholder="なし">
         <label>角ダクト刻み [mm]</label><select id="md_step"><option>25</option><option>50</option><option>100</option></select>
         <label>丸ダクト刻み [mm]</label><select id="md_rstep"><option>25</option><option>50</option></select>
+        <label>圧力単位</label><select id="md_pu"><option value="Pa">Pa</option><option value="mmAq">mmAq</option></select>
         <label>保温厚 [mm]</label><select id="md_ins"><option value="0">なし</option><option>25</option><option>40</option><option>50</option></select>
       </div>
       <div class="mgrid only-g">
@@ -237,10 +239,10 @@ select{font-family:var(--sans);font-size:.78rem}
 <div class="toast" id="toast"></div>
 
 <script>
-const APP_VERSION = 'v02_2026-11-18.4';
+const APP_VERSION = 'v02_2026-11-18.5';
 document.querySelectorAll('.app-ver').forEach(el => el.textContent = APP_VERSION);
 
-const RHO = 1.2, NU = 15.1e-6;
+const RHO = 1.2, NU = 15.1e-6, MMAQ = 9.80665;
 const MATS = [
   { id: 'gi',   name: '亜鉛鉄板',             e: 0.18 },
   { id: 'sus',  name: 'ステンレス',           e: 0.05 },
@@ -272,7 +274,7 @@ const clone = o => JSON.parse(JSON.stringify(o));
 const DEF = {
   q: '5000', unit: 'h', tab: 'duct',
   dPresets: DEF_D_PRESETS, gPresets: DEF_G_PRESETS,
-  d: { preset: 0, R: 1.0, V: 10, mat: 'gi', e: 0.18, Hmax: '', asp: 4, step: 50, rstep: 25, ins: 0 },
+  d: { preset: 0, R: 1.0, V: 10, mat: 'gi', e: 0.18, pu: 'Pa', Hmax: '', asp: 4, step: 50, rstep: 25, ins: 0 },
   g: { preset: 0, ratio: 35, V: 2.5, n: 1, Hmax: '', asp: 4, step: 50 },
 };
 let S;
@@ -402,7 +404,13 @@ function grilleCalc(Q) {
 }
 
 /* ── 表示 ── */
-let dSel = null, gSel = null;
+let dSel = null, gSel = null, dAuto = true, gAuto = true;
+function autoPick(list, W, H) { // 先頭の角サイズ（なければ先頭の規格サイズ）
+  const c = list.find(x => !x.calc && x.H) || list.find(x => !x.calc);
+  if (!c) return null;
+  $(W).value = c.W; $(H).value = c.H || '';
+  return { W: c.W, H: c.H || null };
+}
 let dCandCache = [], gCandCache = [];
 
 function renderCands(el, list, sel, onPick) {
@@ -422,10 +430,11 @@ function resHTML(items) {
     `<div${full ? ' class="full"' : ''}><div class="k">${k}</div><div class="v ${cls || ''}">${v}</div></div>`).join('');
 }
 
+const PU = () => S.d.pu === 'mmAq' ? { k: 1 / MMAQ, u: 'mmAq' } : { k: 1, u: 'Pa' };
 function renderDuct() {
-  const L = ductLimits();
+  const L = ductLimits(), pu = PU();
   $('d_summary').textContent =
-    `Setting: 摩擦損失 ${L.R ? L.R.toFixed(1) + ' Pa/m' : '—'} , 風速 ${L.V ? L.V.toFixed(1) + ' m/s' : '—'}` +
+    `Setting: 摩擦損失 ${L.R ? +(L.R * pu.k).toFixed(3) + ' ' + pu.u + '/m' : '—'} , 風速 ${L.V ? L.V.toFixed(1) + ' m/s' : '—'}` +
     (L.mat.id !== 'gi' ? ` , ${L.mat.e == null ? 'ε=' + L.e + 'mm' : L.mat.name}` : '') + (num(S.d.Hmax) ? ` , H≤${S.d.Hmax}` : '');
   const Q = getQ();
   const note = $('d_note');
@@ -433,9 +442,10 @@ function renderDuct() {
   const r = ductCands(Q);
   if (r.err) { $('d_cands').innerHTML = ''; note.textContent = r.err; note.className = 'note warn'; dCandCache = []; renderDuctRes(); return; }
   dCandCache = r.list;
-  renderCands($('d_cands'), r.list, dSel, c => { dSel = { W: c.W, H: c.H || null }; $('d_W').value = c.W; $('d_H').value = c.H || ''; renderDuct(); });
+  if (dAuto) dSel = autoPick(r.list, 'd_W', 'd_H');
+  renderCands($('d_cands'), r.list, dSel, c => { dAuto = false; dSel = { W: c.W, H: c.H || null }; $('d_W').value = c.W; $('d_H').value = c.H || ''; renderDuct(); });
   note.className = 'note';
-  note.textContent = `必要径：摩擦損失 ${r.dR ? r.dR.toFixed(0) + 'φ' : '—'} ／ 風速 ${r.dV ? r.dV.toFixed(0) + 'φ' : '—'} → ${r.by}で決定` +
+  note.textContent = `必要径：摩擦損失 ${r.dR ? Math.ceil(r.dR) + 'φ' : '—'} ／ 風速 ${r.dV ? Math.ceil(r.dV) + 'φ' : '—'} → ${r.by}で決定` +
     (num(S.d.Hmax) && r.list.length <= 2 ? '（高さ上限内の角ダクト候補なし）' : '');
   renderDuctRes();
 }
@@ -444,7 +454,7 @@ function renderDuctRes() {
   const W = num($('d_W').value), H = num($('d_H').value), Q = getQ();
   if (!W) { $('d_res').innerHTML = resHTML([['サイズを入力するか、候補をタップしてください', '', '', true]]); return; }
   const L = ductLimits();
-  const base = ductBaseQ(W, H, L);
+  const base = ductBaseQ(W, H, L), pu = PU();
   const t = +S.d.ins;
   const items = [];
   if (Q > 0) {
@@ -452,8 +462,8 @@ function renderDuctRes() {
     const vRound = Q / 3600 / (Math.PI * c.De * c.De / 4e6);
     items.push(
       ['風速 [m/s]', fmt(c.v, 2), L.V ? (c.v <= L.V ? 'ok' : 'over') : ''],
-      ['摩擦損失 [Pa/m]', fmt(c.R, 3), L.R ? (c.R <= L.R ? 'ok' : 'over') : ''],
-      ['動圧 [Pa]', fmt(RHO * c.v * c.v / 2, 1)],
+      [`摩擦損失 [${pu.u}/m]`, fmt(c.R * pu.k, pu.u === 'Pa' ? 3 : 4), L.R ? (c.R <= L.R ? 'ok' : 'over') : ''],
+      [`動圧 [${pu.u}]`, fmt(RHO * c.v * c.v / 2 * pu.k, pu.u === 'Pa' ? 1 : 2)],
       ['丸換算風速 [m/s]', H ? fmt(vRound, 2) : '—'],
     );
   }
@@ -463,6 +473,7 @@ function renderDuctRes() {
     [`基準風量 [${UNIT_LBL[S.unit]}]`, base ? fmtN(toUnit(base)) : '—'],
     ['断面積 [m²]', fmt(H ? W * H / 1e6 : Math.PI * W * W / 4e6, 4)],
   );
+  if (Q > 0 && base) items.push(['基準風量比 [%]', fmt(Q / base * 100, 0), Q <= base * 1.0005 ? 'ok' : 'over']);
   if (t) items.push([`外形寸法（保温${t}）[mm]`, H ? `${W + 2 * t} x ${H + 2 * t}` : `${W + 2 * t}φ`, '', true]);
   $('d_res').innerHTML = resHTML(items);
 }
@@ -477,7 +488,8 @@ function renderGrille() {
   const r = grilleCalc(Q);
   if (r.err) { $('g_cands').innerHTML = ''; note.textContent = r.err; note.className = 'note warn'; gCandCache = []; renderGrilleRes(); return; }
   gCandCache = r.list;
-  renderCands($('g_cands'), r.list, gSel, c => { gSel = { W: c.W, H: c.H || null }; $('g_W').value = c.W; $('g_H').value = c.H || ''; renderGrille(); });
+  if (gAuto) gSel = autoPick(r.list, 'g_W', 'g_H');
+  renderCands($('g_cands'), r.list, gSel, c => { gAuto = false; gSel = { W: c.W, H: c.H || null }; $('g_W').value = c.W; $('g_H').value = c.H || ''; renderGrille(); });
   note.className = 'note';
   $('g_per').textContent = `1台あたり ${fmtN(toUnit(r.q1))} ${UNIT_LBL[S.unit]}`;
   note.textContent = `有効面積 ${r.Aeff.toFixed(3)} m² ／ 必要面積 ${r.Areq.toFixed(3)} m²`;
@@ -500,6 +512,7 @@ function renderGrilleRes() {
   if (Q > 0 && Ae) {
     const v = Q / n / 3600 / Ae;
     items.splice(1, 0, ['面風速 [m/s]', fmt(v, 2), Vs ? (v <= Vs ? 'ok' : 'over') : '']);
+    if (Vs) items.push(['基準風量比 [%]', fmt(Q / n / (Ae * Vs * 3600) * 100, 0), Q / n <= Ae * Vs * 3600 * 1.0005 ? 'ok' : 'over']);
     items.push(['必要台数', Vs ? Math.ceil(Q / 3600 / (Ae * Vs) - 1e-9) + ' 台' : '—'],
                ['必要面積 [m²/台]', Vs ? fmt(Q / n / 3600 / Vs / (ratio / 100), 3) : '—']);
   }
@@ -532,7 +545,7 @@ const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;',
 const grpOf = () => S.tab === 'grille' ? 'g' : 'd';
 const presets = grp => grp === 'd' ? S.dPresets : S.gPresets;
 const SF = { d: { mat: 'md_mat', e: 'md_e', V: 'md_V', R: 'md_R', asp: 'md_asp' }, g: { ratio: 'mg_ratio', V: 'mg_V', asp: 'mg_asp' } };
-const CF = { d: { Hmax: 'md_Hmax', step: 'md_step', rstep: 'md_rstep', ins: 'md_ins' }, g: { Hmax: 'mg_Hmax', step: 'mg_step' } };
+const CF = { d: { Hmax: 'md_Hmax', step: 'md_step', rstep: 'md_rstep', ins: 'md_ins', pu: 'md_pu' }, g: { Hmax: 'mg_Hmax', step: 'mg_step' } };
 const same = (a, b) => String(a ?? '') === String(b ?? '');
 const styleOf = grp => Object.fromEntries(Object.keys(SF[grp]).map(k => [k, S[grp][k]]));
 function matchPreset(grp) {
@@ -577,8 +590,31 @@ function mFillSel() {
   if (M.sel === -1) el.add(new Option('（カスタム）', -1));
   el.value = M.sel;
 }
-function mSetForm(vals, fields) { Object.entries(fields).forEach(([k, id]) => { if (vals[k] !== undefined) $(id).value = vals[k]; }); mMatLock(); }
-function mGetForm(fields) { return Object.fromEntries(Object.entries(fields).map(([k, id]) => [k, $(id).value])); }
+const r4 = v => String(+(+v).toFixed(4));
+let Rorig = null;
+function mSetForm(vals, fields) {
+  Object.entries(fields).forEach(([k, id]) => {
+    if (vals[k] === undefined) return;
+    if (k === 'R') Rorig = vals.R;
+    $(id).value = (k === 'R' && vals.R !== '' && $('md_pu').value === 'mmAq') ? r4(vals.R / MMAQ) : vals[k];
+  });
+  mMatLock(); mRLabel();
+}
+function mGetForm(fields) {
+  return Object.fromEntries(Object.entries(fields).map(([k, id]) => {
+    let v = $(id).value;
+    if (k === 'R' && v !== '' && $('md_pu').value === 'mmAq') v = (Rorig !== '' && Rorig != null && v === r4(Rorig / MMAQ)) ? Rorig : r4(v * MMAQ);
+    return [k, v];
+  }));
+}
+function mRLabel() { $('md_Rlbl').textContent = `摩擦損失 [${$('md_pu').value}/m]`; }
+let puPrev = 'Pa';
+$('md_pu').addEventListener('focus', () => { puPrev = $('md_pu').value; });
+$('md_pu').addEventListener('change', () => {
+  const v = $('md_R').value, now = $('md_pu').value;
+  if (v !== '' && now !== puPrev) $('md_R').value = r4(now === 'mmAq' ? v / MMAQ : v * MMAQ);
+  puPrev = now; mRLabel();
+});
 function mMatLock() {
   if (M.grp !== 'd') return;
   const m = MATS.find(x => x.id === $('md_mat').value) || MATS[0];
@@ -589,7 +625,8 @@ $('md_mat').addEventListener('change', mMatLock);
 function openModal() {
   M = { grp: grpOf(), sel: +S[grpOf()].preset };
   mFillSel();
-  mSetForm(S[M.grp], SF[M.grp]); mSetForm(S[M.grp], CF[M.grp]);
+  if (M.grp === 'd') { $('md_pu').value = S.d.pu || 'Pa'; puPrev = $('md_pu').value; }
+  mSetForm(S[M.grp], CF[M.grp]); mSetForm(S[M.grp], SF[M.grp]);
   $('st_namerow').hidden = true;
   $('modal').hidden = false;
 }
@@ -694,8 +731,8 @@ $('unit').addEventListener('change', () => {
   if (qh > 0) { S.q = String(+toUnit(qh).toFixed(2)); $('q').value = S.q; }
   save(); renderAll();
 });
-['d_W', 'd_H'].forEach(id => $(id).addEventListener('input', () => { dSel = { W: num($('d_W').value), H: num($('d_H').value) }; renderDuct(); }));
-['g_W', 'g_H'].forEach(id => $(id).addEventListener('input', () => { gSel = { W: num($('g_W').value), H: num($('g_H').value) }; renderGrille(); }));
+['d_W', 'd_H'].forEach(id => $(id).addEventListener('input', () => { dSel = { W: num($('d_W').value), H: num($('d_H').value) }; dAuto = !dSel.W; renderDuct(); }));
+['g_W', 'g_H'].forEach(id => $(id).addEventListener('input', () => { gSel = { W: num($('g_W').value), H: num($('g_H').value) }; gAuto = !gSel.W; renderGrille(); }));
 
 document.querySelectorAll('.tab-btn').forEach(b => b.onclick = () => {
   S.tab = b.dataset.tab; save();
