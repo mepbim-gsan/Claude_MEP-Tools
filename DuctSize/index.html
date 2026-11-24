@@ -81,6 +81,21 @@ select{font-family:var(--sans);font-size:.78rem}
 .io .btn{padding:4px 8px;font-size:.7rem}
 .mfoot{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
 .mfoot .btn{padding:9px 4px;font-size:.84rem}
+.maddrow{display:flex;gap:4px;margin-bottom:6px}.maddrow input{flex:1;font-family:var(--sans);font-size:.8rem;padding:5px 8px}
+.maddrow .btn{padding:5px 10px;font-size:.74rem}
+.btn.pri{background:var(--accent);border-color:var(--accent);color:#fff}
+.mitem{padding:5px 2px;border-bottom:1px dashed var(--bd);cursor:pointer;-webkit-tap-highlight-color:transparent}
+.mitem:active{background:var(--accent-l)}
+.m1{display:flex;align-items:center;gap:8px}
+.mname{font-size:.8rem;font-weight:700;color:var(--tx);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-decoration:underline dotted var(--tx3)}
+.mren{flex:1;min-width:0;font-family:var(--sans);font-size:.8rem;padding:2px 6px}
+.mq{font-family:var(--mono);font-size:.74rem;color:var(--tx2);white-space:nowrap}
+.msz{font-family:var(--mono);font-size:.86rem;font-weight:500;color:var(--accent);white-space:nowrap;min-width:72px;text-align:right}
+.mdel{border:none;background:none;color:var(--tx3);font-size:1rem;padding:0 4px;cursor:pointer}
+.m2{display:flex;justify-content:space-between;gap:8px;font-size:.64rem;color:var(--tx3);margin-top:1px}
+.m2 span:last-child{font-family:var(--mono);white-space:nowrap}
+.m2 .ok{color:var(--green)}.m2 .over{color:var(--red)}
+.mempty{font-size:.66rem;color:var(--tx3);padding:2px}
 .ver a{color:var(--tx3)}
 .ver{text-align:center;font-size:.62rem;color:var(--tx3);font-family:var(--mono);margin-top:6px}
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--tx);color:#fff;font-size:.78rem;padding:8px 14px;border-radius:20px;opacity:0;transition:opacity .2s;pointer-events:none}
@@ -142,6 +157,12 @@ select{font-family:var(--sans);font-size:.78rem}
     </span><button class="btn act" id="d_copy1">コピー</button></h2>
     <div class="res" id="d_res"></div>
   </div>
+
+  <div class="card">
+    <h2>メモリ <span class="sub" id="d_mcnt"></span><button class="btn act" id="d_mall">全コピー</button><button class="btn" id="d_mclr">全削除</button></h2>
+    <div class="maddrow"><input id="d_mname" type="text" placeholder="名前（空欄で連番）"><button class="btn pri" id="d_madd">＋メモリ</button></div>
+    <div class="mlist" id="d_mlist"></div>
+  </div>
 </div>
 
 <!-- ══ GRILLE ══ -->
@@ -158,6 +179,12 @@ select{font-family:var(--sans);font-size:.78rem}
       <input id="g_H" type="number" inputmode="numeric" placeholder="H">
     </span><button class="btn act" id="g_copy1">コピー</button></h2>
     <div class="res" id="g_res"></div>
+  </div>
+
+  <div class="card">
+    <h2>メモリ <span class="sub" id="g_mcnt"></span><button class="btn act" id="g_mall">全コピー</button><button class="btn" id="g_mclr">全削除</button></h2>
+    <div class="maddrow"><input id="g_mname" type="text" placeholder="名前（空欄で連番）"><button class="btn pri" id="g_madd">＋メモリ</button></div>
+    <div class="mlist" id="g_mlist"></div>
   </div>
 </div>
 
@@ -239,7 +266,7 @@ select{font-family:var(--sans);font-size:.78rem}
 <div class="toast" id="toast"></div>
 
 <script>
-const APP_VERSION = 'v02_2026-11-18.5';
+const APP_VERSION = 'v03_2026-11-24';
 document.querySelectorAll('.app-ver').forEach(el => el.textContent = APP_VERSION);
 
 const RHO = 1.2, NU = 15.1e-6, MMAQ = 9.80665;
@@ -276,6 +303,7 @@ const DEF = {
   dPresets: DEF_D_PRESETS, gPresets: DEF_G_PRESETS,
   d: { preset: 0, R: 1.0, V: 10, mat: 'gi', e: 0.18, pu: 'Pa', Hmax: '', asp: 4, step: 50, rstep: 25, ins: 0 },
   g: { preset: 0, ratio: 35, V: 2.5, n: 1, Hmax: '', asp: 4, step: 50 },
+  memo: [], memoSeq: {},
 };
 let S;
 try { S = JSON.parse(localStorage.getItem('ductsize') || 'null'); } catch (e) { S = null; }
@@ -293,6 +321,8 @@ function normalize(o) {
   o.dPresets.forEach(p => { fixMat(p); if (p.asp == null) p.asp = 4; });
   o.gPresets.forEach(p => { if (p.asp == null) p.asp = 4; });
   fixMat(o.d);
+  if (!Array.isArray(o.memo)) o.memo = [];
+  if (!o.memoSeq || typeof o.memoSeq !== 'object') o.memoSeq = {};
   delete o.mats;
   return o;
 }
@@ -519,7 +549,7 @@ function renderGrilleRes() {
   $('g_res').innerHTML = resHTML(items);
 }
 
-function renderAll() { renderDuct(); renderGrille(); }
+function renderAll() { renderDuct(); renderGrille(); renderMemo(); }
 
 /* ── コピー ── */
 function copy(text) {
@@ -717,9 +747,10 @@ $('impf').onchange = async () => {
   save(); closeModal(); fillMain(); renderAll(); toast('読み込みました');
 };
 $('rst').onclick = () => {
-  if (!confirm('スタイル・設定をすべて初期状態に戻しますか？')) return;
+  if (!confirm('スタイル・設定をすべて初期状態に戻しますか？（メモリは残ります）')) return;
   const tab = S.tab;
-  S = normalize(null); S.tab = tab;
+  const memo = S.memo, memoSeq = S.memoSeq;
+  S = normalize(null); S.tab = tab; S.memo = memo; S.memoSeq = memoSeq;
   save(); closeModal(); fillMain(); renderAll(); toast('初期化しました');
 };
 
@@ -754,6 +785,113 @@ $('manual-link').onclick = e => {
 };
 if (S.tab === 'manual') S.tab = 'duct';
 document.querySelector(`.tab-btn[data-tab="${S.tab}"]`)?.click();
+/* ── メモリ ── */
+const PNAME = grp => { const p = presets(grp)[+S[grp].preset]; return p ? p.name : '（カスタム）'; };
+function memoResult(m) {
+  const Q = m.qh;
+  if (m.t === 'd') {
+    const st = m.st, mat = MATS.find(x => x.id === st.mat) || MATS[0];
+    const L = { R: num(st.R), V: num(st.V), e: isFinite(parseFloat(st.e)) ? parseFloat(st.e) : (mat.e ?? 0.18), mat };
+    const c = ductCheck(Q, m.W, m.H, L), base = ductBaseQ(m.W, m.H, L);
+    return { v: c.v, R: c.R, ratio: base ? Q / base * 100 : null, okV: !L.V || c.v <= L.V, okR: !L.R || c.R <= L.R };
+  }
+  const ratio = num(m.st.ratio), Vs = num(m.st.V), n = Math.max(1, +m.n || 1);
+  const A = m.H ? m.W * m.H / 1e6 : Math.PI * m.W * m.W / 4e6, Ae = ratio ? A * ratio / 100 : null;
+  const v = Ae ? Q / n / 3600 / Ae : null;
+  return { v, ratio: Ae && Vs ? Q / n / (Ae * Vs * 3600) * 100 : null, okV: !Vs || v <= Vs };
+}
+const memoSize = m => m.H ? `${m.W}x${m.H}` : `${m.W}φ`;
+function memoLine(m) {
+  const r = memoResult(m), pu = PU();
+  if (m.t === 'd') return [`${fmt(r.v, 2)}m/s`, `${fmt(r.R * pu.k, pu.u === 'Pa' ? 3 : 4)}${pu.u}/m`, r.ratio ? fmt(r.ratio, 0) + '%' : ''].filter(Boolean);
+  return [`${m.n}台`, `${fmt(r.v, 2)}m/s`, r.ratio ? fmt(r.ratio, 0) + '%' : ''].filter(Boolean);
+}
+function renderMemo() {
+  ['d', 'g'].forEach(t => {
+    const list = S.memo.filter(m => m.t === t);
+    $(t + '_mcnt').textContent = list.length ? `${list.length}件` : '';
+    $(t + '_mlist').innerHTML = list.length ? list.map(m => {
+      const r = memoResult(m), ln = memoLine(m), ok = r.okV && (r.okR !== false);
+      return `<div class="mitem" data-id="${m.id}">
+        <div class="m1"><span class="mname" data-ren="${m.id}">${esc(m.name)}</span><span class="mq">${fmtN(m.q)} ${UNIT_LBL[m.unit]}</span><span class="msz">${memoSize(m)}</span><button class="mdel" data-del="${m.id}" aria-label="削除">×</button></div>
+        <div class="m2"><span>${esc(m.pname)}</span><span class="${ok ? 'ok' : 'over'}">${ln.join(' ／ ')}</span></div>
+      </div>`;
+    }).join('') : '<div class="mempty">「＋メモリ」で現在のサイズと条件を記録できます</div>';
+  });
+}
+function memoAdd(t) {
+  const Wid = t + '_W', Hid = t + '_H';
+  const W = num($(Wid).value), H = num($(Hid).value), qh = getQ();
+  if (!(qh > 0)) { toast('風量を入力してください'); return; }
+  if (!W) { toast('サイズを選択してください'); return; }
+  const cnt = S.memo.filter(m => m.t === t).length;
+  const name = $(t + '_mname').value.trim() || `No.${(S.memoSeq[t] = (S.memoSeq[t] || cnt) + 1)}`;
+  const st = styleOf(t);
+  S.memo.unshift({
+    id: 'm' + Date.now(), t, name, q: +toUnit(qh).toFixed(2), unit: S.unit, qh, W, H: H || null,
+    pname: PNAME(t), st, n: t === 'g' ? Math.max(1, Math.floor(num(S.g.n) || 1)) : undefined,
+  });
+  $(t + '_mname').value = '';
+  save(); renderMemo(); toast('メモリに記録しました');
+}
+function memoRestore(m) {
+  const t = m.t;
+  S.unit = m.unit; S.q = String(m.q);
+  Object.assign(S[t], m.st);
+  if (t === 'g') S.g.n = m.n;
+  const idx = presets(t).findIndex(p => p.name === m.pname);
+  S[t].preset = idx; matchPreset(t);
+  $(t + '_W').value = m.W; $(t + '_H').value = m.H || '';
+  if (t === 'd') { dAuto = false; dSel = { W: m.W, H: m.H }; } else { gAuto = false; gSel = { W: m.W, H: m.H }; }
+  save(); fillMain(); renderAll(); renderMemo();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+  toast(`「${m.name}」を呼び出しました`);
+}
+['d', 'g'].forEach(t => {
+  $(t + '_madd').onclick = () => memoAdd(t);
+  $(t + '_mname').addEventListener('keydown', e => { if (e.key === 'Enter') memoAdd(t); });
+  $(t + '_mclr').onclick = () => {
+    if (!S.memo.some(m => m.t === t)) return;
+    if (!confirm('この画面のメモリをすべて削除しますか？')) return;
+    S.memo = S.memo.filter(m => m.t !== t); S.memoSeq[t] = 0;
+    save(); renderMemo();
+  };
+  $(t + '_mall').onclick = () => {
+    const list = S.memo.filter(m => m.t === t);
+    if (!list.length) return;
+    const pu = PU();
+    const head = t === 'd'
+      ? ['名前', '風量', '単位', 'サイズ', 'スタイル', `摩擦損失上限[${pu.u}/m]`, '風速上限[m/s]', 'ε[mm]', '風速[m/s]', `摩擦損失[${pu.u}/m]`, '基準風量比[%]']
+      : ['名前', '風量', '単位', '台数', 'サイズ', 'スタイル', '開口率[%]', '面風速上限[m/s]', '面風速[m/s]', '基準風量比[%]'];
+    const rows = list.map(m => {
+      const r = memoResult(m);
+      return t === 'd'
+        ? [m.name, m.q, UNIT_LBL[m.unit], memoSize(m), m.pname, m.st.R === '' ? '' : +(m.st.R * pu.k).toFixed(4), m.st.V, m.st.e, fmt(r.v, 2), fmt(r.R * pu.k, 4), fmt(r.ratio, 0)]
+        : [m.name, m.q, UNIT_LBL[m.unit], m.n, memoSize(m), m.pname, m.st.ratio, m.st.V, fmt(r.v, 2), fmt(r.ratio, 0)];
+    });
+    copy([head, ...rows].map(r => r.join('\t')).join('\n'));
+  };
+  $(t + '_mlist').addEventListener('click', e => {
+    const del = e.target.closest('[data-del]');
+    if (del) { S.memo = S.memo.filter(m => m.id !== del.dataset.del); save(); renderMemo(); return; }
+    const ren = e.target.closest('[data-ren]');
+    if (ren) {
+      const m = S.memo.find(x => x.id === ren.dataset.ren);
+      const inp = document.createElement('input');
+      inp.className = 'mren'; inp.value = m.name;
+      ren.replaceWith(inp); inp.focus(); inp.select();
+      const done = ok => { if (ok && inp.value.trim()) m.name = inp.value.trim(); save(); renderMemo(); };
+      inp.addEventListener('keydown', ev => { if (ev.key === 'Enter') inp.blur(); if (ev.key === 'Escape') { inp.value = ''; inp.blur(); } });
+      inp.addEventListener('blur', () => done(true));
+      inp.addEventListener('click', ev => ev.stopPropagation());
+      return;
+    }
+    if (e.target.closest('.mren')) return;
+    const it = e.target.closest('.mitem');
+    if (it) memoRestore(S.memo.find(m => m.id === it.dataset.id));
+  });
+});
+
 renderAll();
 </script>
 </body>
