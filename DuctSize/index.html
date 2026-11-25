@@ -238,6 +238,7 @@ select{font-family:var(--sans);font-size:.78rem}
         <label>ダクト材質</label><select id="md_mat"></select>
         <label>内面粗度 [mm]</label><input id="md_e" class="num" type="number" step="0.01" inputmode="decimal">
         <label>最大ダクト内風速 [m/s]</label><input id="md_V" class="num" type="number" step="0.5" inputmode="decimal" placeholder="制限なし">
+        <label>圧力単位</label><select id="md_pu"><option value="Pa">Pa</option><option value="mmAq">mmAq</option></select>
         <label id="md_Rlbl">摩擦損失 [Pa/m]</label><input id="md_R" class="num" type="number" step="0.1" inputmode="decimal" placeholder="制限なし">
         <label>アスペクト比</label><input id="md_asp" class="num" type="number" step="0.5" inputmode="decimal">
       </div>
@@ -253,7 +254,6 @@ select{font-family:var(--sans);font-size:.78rem}
         <label>高さ上限 [mm]</label><input id="md_Hmax" class="num" type="number" step="50" inputmode="numeric" placeholder="なし">
         <label>角ダクト刻み [mm]</label><select id="md_step"><option>25</option><option>50</option><option>100</option></select>
         <label>丸ダクト刻み [mm]</label><select id="md_rstep"><option>25</option><option>50</option></select>
-        <label>圧力単位</label><select id="md_pu"><option value="Pa">Pa</option><option value="mmAq">mmAq</option></select>
         <label>保温厚 [mm]</label><select id="md_ins"><option value="0">なし</option><option>25</option><option>40</option><option>50</option></select>
       </div>
       <div class="mgrid only-g">
@@ -268,7 +268,7 @@ select{font-family:var(--sans);font-size:.78rem}
 <div class="toast" id="toast"></div>
 
 <script>
-const APP_VERSION = 'v03_2026-11-25.2';
+const APP_VERSION = 'v03_2026-11-25.3';
 document.querySelectorAll('.app-ver').forEach(el => el.textContent = APP_VERSION);
 
 const RHO = 1.2, NU = 15.1e-6, MMAQ = 9.80665;
@@ -276,16 +276,30 @@ const MATS = [
   { id: 'gi',   name: '亜鉛鉄板',             e: 0.18 },
   { id: 'sus',  name: 'ステンレス',           e: 0.05 },
   { id: 'pvc',  name: '塩ビ',                 e: 0.01 },
+  { id: 'dsp',  name: '引抜鋼管',             e: 0.03 },
   { id: 'gw',   name: 'グラスウールダクト',   e: 0.9  },
   { id: 'flex', name: 'フレキシブル（伸長）', e: 3.0  },
+  { id: 'conc', name: 'コンクリート',         e: 3.0  },
   { id: 'other', name: 'その他',              e: null },
 ];
+// R は Pa/m で保持（0.10 mmAq/m = 0.980665 Pa/m）。pu はスタイルの表示単位
+const P01 = 0.980665, P03 = 2.941995;
 const DEF_D_PRESETS = [
-  { name: '標準（低速）ダクト', mat: 'gi', e: 0.18, V: 10, R: 1.0, asp: 4 },
-  { name: '低騒音（居室系）',   mat: 'gi', e: 0.18, V: 6,  R: 0.8, asp: 4 },
-  { name: '高速ダクト',         mat: 'gi', e: 0.18, V: 20, R: 3.0, asp: 4 },
-  { name: '排煙ダクト',         mat: 'gi', e: 0.18, V: 20, R: '',  asp: 4 },
+  { name: '標準（低速）ダクト [Pa]',   mat: 'gi',   e: 0.18, V: 10, R: 1.0, asp: 4, pu: 'Pa' },
+  { name: '高速（排煙）ダクト [Pa]',   mat: 'gi',   e: 0.18, V: 15, R: 3.0, asp: 4, pu: 'Pa' },
+  { name: 'コンクリートダクト [Pa]',   mat: 'conc', e: 3.0,  V: 10, R: 3.0, asp: 4, pu: 'Pa' },
+  { name: 'グラスウールダクト [Pa]',   mat: 'gw',   e: 0.9,  V: 10, R: 1.0, asp: 4, pu: 'Pa' },
+  { name: '標準（低速）ダクト [mmAq]', mat: 'gi',   e: 0.18, V: 10, R: P01, asp: 4, pu: 'mmAq' },
+  { name: '高速（排煙）ダクト [mmAq]', mat: 'gi',   e: 0.18, V: 15, R: P03, asp: 4, pu: 'mmAq' },
+  { name: 'コンクリートダクト [mmAq]', mat: 'conc', e: 3.0,  V: 10, R: P03, asp: 4, pu: 'mmAq' },
+  { name: 'グラスウールダクト [mmAq]', mat: 'gw',   e: 0.9,  V: 10, R: P01, asp: 4, pu: 'mmAq' },
+  { name: '引抜鋼管 [mmAq]',           mat: 'dsp',  e: 0.03, V: 10, R: P01, asp: 4, pu: 'mmAq' },
+  { name: '低騒音（居室系）',          mat: 'gi',   e: 0.18, V: 6,  R: 0.8, asp: 4, pu: 'Pa' },
+  { name: '高速ダクト',                mat: 'gi',   e: 0.18, V: 20, R: 3.0, asp: 4, pu: 'Pa' },
+  { name: '排煙ダクト',                mat: 'gi',   e: 0.18, V: 20, R: '',  asp: 4, pu: 'Pa' },
 ];
+// 既存ユーザーには名前が無いものだけ追記（標準（低速）[Pa] は旧「標準（低速）ダクト」と同値のため除外）
+const ADD_D_PRESETS_2 = DEF_D_PRESETS.slice(1, 9);
 const DEF_G_PRESETS = [
   { name: 'OA/EA ガラリ - 35% - 2.5m/s', ratio: 35, V: 2.5, asp: 4 },
   { name: 'OA/EA ガラリ - 35% - 3.0m/s', ratio: 35, V: 3.0, asp: 4 },
@@ -305,11 +319,12 @@ const DEF = {
   dPresets: DEF_D_PRESETS, gPresets: DEF_G_PRESETS,
   d: { preset: 0, R: 1.0, V: 10, mat: 'gi', e: 0.18, pu: 'Pa', Hmax: '', asp: 4, step: 50, rstep: 25, ins: 0 },
   g: { preset: 0, ratio: 35, V: 2.5, n: 1, Hmax: '', asp: 4, step: 50 },
-  memo: [], memoSeq: {},
+  memo: [], memoSeq: {}, presetsVer: 2,
 };
 let S;
 try { S = JSON.parse(localStorage.getItem('ductsize') || 'null'); } catch (e) { S = null; }
 function normalize(o) {
+  const pv = o && o.presetsVer;
   o = Object.assign(clone(DEF), o || {});
   o.d = Object.assign(clone(DEF.d), o.d); o.g = Object.assign(clone(DEF.g), o.g);
   ['dPresets', 'gPresets'].forEach(k => { if (!Array.isArray(o[k]) || !o[k].length) o[k] = clone(DEF[k]); });
@@ -320,7 +335,11 @@ function normalize(o) {
     if (old) x.e = old.e; else if (x.e == null || x.e === '') x.e = 0.18;
     x.mat = x.mat === 'other' || old ? 'other' : 'gi';
   };
-  o.dPresets.forEach(p => { fixMat(p); if (p.asp == null) p.asp = 4; });
+  if (!(pv >= 2) && o.dPresets !== DEF.dPresets) {
+    ADD_D_PRESETS_2.forEach(a => { if (!o.dPresets.some(p => p.name === a.name)) o.dPresets.push(clone(a)); });
+    o.presetsVer = 2;
+  }
+  o.dPresets.forEach(p => { fixMat(p); if (p.asp == null) p.asp = 4; if (!p.pu) p.pu = o.d.pu || 'Pa'; });
   o.gPresets.forEach(p => { if (p.asp == null) p.asp = 4; });
   fixMat(o.d);
   if (!Array.isArray(o.memo)) o.memo = [];
@@ -576,8 +595,8 @@ $('g_copy1').onclick = () => copy(qText() + '\nサイズ\t' + $('g_W').value + (
 const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const grpOf = () => S.tab === 'grille' ? 'g' : 'd';
 const presets = grp => grp === 'd' ? S.dPresets : S.gPresets;
-const SF = { d: { mat: 'md_mat', e: 'md_e', V: 'md_V', R: 'md_R', asp: 'md_asp' }, g: { ratio: 'mg_ratio', V: 'mg_V', asp: 'mg_asp' } };
-const CF = { d: { Hmax: 'md_Hmax', step: 'md_step', rstep: 'md_rstep', ins: 'md_ins', pu: 'md_pu' }, g: { Hmax: 'mg_Hmax', step: 'mg_step' } };
+const SF = { d: { pu: 'md_pu', mat: 'md_mat', e: 'md_e', V: 'md_V', R: 'md_R', asp: 'md_asp' }, g: { ratio: 'mg_ratio', V: 'mg_V', asp: 'mg_asp' } };
+const CF = { d: { Hmax: 'md_Hmax', step: 'md_step', rstep: 'md_rstep', ins: 'md_ins' }, g: { Hmax: 'mg_Hmax', step: 'mg_step' } };
 const same = (a, b) => String(a ?? '') === String(b ?? '');
 const styleOf = grp => Object.fromEntries(Object.keys(SF[grp]).map(k => [k, S[grp][k]]));
 function matchPreset(grp) {
@@ -630,7 +649,7 @@ function mSetForm(vals, fields) {
     if (k === 'R') Rorig = vals.R;
     $(id).value = (k === 'R' && vals.R !== '' && $('md_pu').value === 'mmAq') ? r4(vals.R / MMAQ) : vals[k];
   });
-  mMatLock(); mRLabel();
+  mMatLock(); mRLabel(); puPrev = $('md_pu').value;
 }
 function mGetForm(fields) {
   return Object.fromEntries(Object.entries(fields).map(([k, id]) => {
