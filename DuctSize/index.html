@@ -268,14 +268,14 @@ select{font-family:var(--sans);font-size:.78rem}
 <div class="toast" id="toast"></div>
 
 <script>
-const APP_VERSION = 'v03_2026-11-25.3';
+const APP_VERSION = 'v03_2026-11-25.4';
 document.querySelectorAll('.app-ver').forEach(el => el.textContent = APP_VERSION);
 
 const RHO = 1.2, NU = 15.1e-6, MMAQ = 9.80665;
 const MATS = [
   { id: 'gi',   name: '亜鉛鉄板',             e: 0.18 },
-  { id: 'sus',  name: 'ステンレス',           e: 0.05 },
-  { id: 'pvc',  name: '塩ビ',                 e: 0.01 },
+  { id: 'sus',  name: 'ステンレス鋼板',       e: 0.18 },
+  { id: 'pvc',  name: '塩化ビニル',           e: 0.03 },
   { id: 'dsp',  name: '引抜鋼管',             e: 0.03 },
   { id: 'gw',   name: 'グラスウールダクト',   e: 0.9  },
   { id: 'flex', name: 'フレキシブル（伸長）', e: 3.0  },
@@ -289,6 +289,9 @@ const DEF_D_PRESETS = [
   { name: '高速（排煙）ダクト [Pa]',   mat: 'gi',   e: 0.18, V: 15, R: 3.0, asp: 4, pu: 'Pa' },
   { name: 'コンクリートダクト [Pa]',   mat: 'conc', e: 3.0,  V: 10, R: 3.0, asp: 4, pu: 'Pa' },
   { name: 'グラスウールダクト [Pa]',   mat: 'gw',   e: 0.9,  V: 10, R: 1.0, asp: 4, pu: 'Pa' },
+  { name: '引抜鋼管 [Pa]',             mat: 'dsp',  e: 0.03, V: 10, R: 1.0, asp: 4, pu: 'Pa' },
+  { name: '塩ビダクト [Pa]',           mat: 'pvc',  e: 0.03, V: 10, R: 1.0, asp: 4, pu: 'Pa' },
+  { name: 'ステンレスダクト [Pa]',     mat: 'sus',  e: 0.18, V: 10, R: 1.0, asp: 4, pu: 'Pa' },
   { name: '標準（低速）ダクト [mmAq]', mat: 'gi',   e: 0.18, V: 10, R: P01, asp: 4, pu: 'mmAq' },
   { name: '高速（排煙）ダクト [mmAq]', mat: 'gi',   e: 0.18, V: 15, R: P03, asp: 4, pu: 'mmAq' },
   { name: 'コンクリートダクト [mmAq]', mat: 'conc', e: 3.0,  V: 10, R: P03, asp: 4, pu: 'mmAq' },
@@ -299,7 +302,7 @@ const DEF_D_PRESETS = [
   { name: '排煙ダクト',                mat: 'gi',   e: 0.18, V: 20, R: '',  asp: 4, pu: 'Pa' },
 ];
 // 既存ユーザーには名前が無いものだけ追記（標準（低速）[Pa] は旧「標準（低速）ダクト」と同値のため除外）
-const ADD_D_PRESETS_2 = DEF_D_PRESETS.slice(1, 9);
+const ADD_D_PRESETS_2 = DEF_D_PRESETS.slice(1, 12);
 const DEF_G_PRESETS = [
   { name: 'OA/EA ガラリ - 35% - 2.5m/s', ratio: 35, V: 2.5, asp: 4 },
   { name: 'OA/EA ガラリ - 35% - 3.0m/s', ratio: 35, V: 3.0, asp: 4 },
@@ -319,7 +322,7 @@ const DEF = {
   dPresets: DEF_D_PRESETS, gPresets: DEF_G_PRESETS,
   d: { preset: 0, R: 1.0, V: 10, mat: 'gi', e: 0.18, pu: 'Pa', Hmax: '', asp: 4, step: 50, rstep: 25, ins: 0 },
   g: { preset: 0, ratio: 35, V: 2.5, n: 1, Hmax: '', asp: 4, step: 50 },
-  memo: [], memoSeq: {}, presetsVer: 2,
+  memo: [], memoSeq: {}, presetsVer: 3,
 };
 let S;
 try { S = JSON.parse(localStorage.getItem('ductsize') || 'null'); } catch (e) { S = null; }
@@ -335,9 +338,9 @@ function normalize(o) {
     if (old) x.e = old.e; else if (x.e == null || x.e === '') x.e = 0.18;
     x.mat = x.mat === 'other' || old ? 'other' : 'gi';
   };
-  if (!(pv >= 2) && o.dPresets !== DEF.dPresets) {
+  if (!(pv >= 3)) {
     ADD_D_PRESETS_2.forEach(a => { if (!o.dPresets.some(p => p.name === a.name)) o.dPresets.push(clone(a)); });
-    o.presetsVer = 2;
+    o.presetsVer = 3;
   }
   o.dPresets.forEach(p => { fixMat(p); if (p.asp == null) p.asp = 4; if (!p.pu) p.pu = o.d.pu || 'Pa'; });
   o.gPresets.forEach(p => { if (p.asp == null) p.asp = 4; });
