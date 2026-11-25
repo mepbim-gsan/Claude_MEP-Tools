@@ -269,7 +269,7 @@ select{font-family:var(--sans);font-size:.78rem}
 <div class="toast" id="toast"></div>
 
 <script>
-const APP_VERSION = 'v03_2026-11-25.8';
+const APP_VERSION = 'v03_2026-11-25.9';
 document.querySelectorAll('.app-ver').forEach(el => el.textContent = APP_VERSION);
 
 const RHO = 1.2, NU = 15.1e-6, MMAQ = 9.80665;
@@ -331,7 +331,7 @@ const DEF = {
   q: '5000', unit: 'h', tab: 'duct',
   dPresets: DEF_D_PRESETS, gPresets: DEF_G_PRESETS,
   d: { preset: 0, R: 1.0, V: 10, mat: 'gi', e: 0.18, pu: 'Pa', Hmax: '', asp: 4, step: 50, rstep: 25, ins: 0 },
-  g: { preset: 0, ratio: 35, V: 2.5, n: 1, Hmax: '', asp: 4, step: 50 },
+  g: { preset: 0, ratio: 75, V: 2.5, n: 1, Hmax: '', asp: 4, step: 50 },
   memo: [], memoSeq: {}, presetsVer: 6,
 };
 let S;
@@ -626,9 +626,11 @@ const SF = { d: { pu: 'md_pu', mat: 'md_mat', e: 'md_e', V: 'md_V', R: 'md_R', a
 const CF = { d: { Hmax: 'md_Hmax', step: 'md_step', rstep: 'md_rstep', ins: 'md_ins' }, g: { Hmax: 'mg_Hmax', step: 'mg_step' } };
 const same = (a, b) => String(a ?? '') === String(b ?? '');
 const styleOf = grp => Object.fromEntries(Object.keys(SF[grp]).map(k => [k, S[grp][k]]));
+// 選択中のスタイルと計算値が一致しなければ、値が一致する別スタイルを選ぶ（無ければカスタム）
 function matchPreset(grp) {
-  const i = +S[grp].preset, p = presets(grp)[i];
-  if (!p || !Object.keys(SF[grp]).every(k => same(p[k], S[grp][k]))) S[grp].preset = -1;
+  const eq = p => p && Object.keys(SF[grp]).every(k => same(p[k], S[grp][k]));
+  if (eq(presets(grp)[+S[grp].preset])) return;
+  S[grp].preset = presets(grp).findIndex(eq);
 }
 function fillMain() {
   ['d', 'g'].forEach(grp => {
@@ -649,6 +651,7 @@ function fillMain() {
 }));
 MATS.forEach(m => $('md_mat').add(new Option(m.name, m.id)));
 $('m_mat').innerHTML = MATS.filter(m => m.e != null).map(m => `<tr><td>${esc(m.name)}</td><td>${m.e}</td></tr>`).join('');
+matchPreset('d'); matchPreset('g'); save();
 fillMain();
 function setN(n) {
   n = Math.max(1, Math.floor(n) || 1);
