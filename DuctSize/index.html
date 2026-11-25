@@ -268,7 +268,7 @@ select{font-family:var(--sans);font-size:.78rem}
 <div class="toast" id="toast"></div>
 
 <script>
-const APP_VERSION = 'v03_2026-11-25.5';
+const APP_VERSION = 'v03_2026-11-25.6';
 document.querySelectorAll('.app-ver').forEach(el => el.textContent = APP_VERSION);
 
 const RHO = 1.2, NU = 15.1e-6, MMAQ = 9.80665;
@@ -309,6 +309,9 @@ const DEF_G_PRESETS = [
   { name: 'OAG - 35% - 2.0m/s',          ratio: 35, V: 2.0, asp: 4 },
   { name: 'EAG - 35% - 2.5m/s',          ratio: 35, V: 2.5, asp: 4 },
   { name: 'RAG - 50% - 2.0m/s',          ratio: 50, V: 2.0, asp: 4 },
+  { name: 'SEG - 35% - 7.0m/s',          ratio: 35, V: 7.0, asp: 4 },
+  { name: '排煙口 - 90% - 8.0m/s',       ratio: 90, V: 8.0, asp: 4 },
+  { name: 'DG - 60% - 1.0m/s',           ratio: 60, V: 1.0, asp: 4 },
   { name: 'OA/EA ガラリ - 35% - 2.5m/s', ratio: 35, V: 2.5, asp: 4 },
   { name: 'OA/EA ガラリ - 35% - 3.0m/s', ratio: 35, V: 3.0, asp: 4 },
   { name: '吹出口 VHS - 70% - 3.0m/s',   ratio: 70, V: 3.0, asp: 4 },
@@ -327,7 +330,7 @@ const DEF = {
   dPresets: DEF_D_PRESETS, gPresets: DEF_G_PRESETS,
   d: { preset: 0, R: 1.0, V: 10, mat: 'gi', e: 0.18, pu: 'Pa', Hmax: '', asp: 4, step: 50, rstep: 25, ins: 0 },
   g: { preset: 0, ratio: 35, V: 2.5, n: 1, Hmax: '', asp: 4, step: 50 },
-  memo: [], memoSeq: {}, presetsVer: 4,
+  memo: [], memoSeq: {}, presetsVer: 5,
 };
 let S;
 try { S = JSON.parse(localStorage.getItem('ductsize') || 'null'); } catch (e) { S = null; }
@@ -348,9 +351,9 @@ function normalize(o) {
     o.presetsVer = 3;
   }
   o.dPresets.forEach(p => { fixMat(p); if (p.asp == null) p.asp = 4; if (!p.pu) p.pu = o.d.pu || 'Pa'; });
-  if (!(pv >= 4)) {
-    DEF_G_PRESETS.slice(0, 5).forEach(a => { if (!o.gPresets.some(p => p.name === a.name)) o.gPresets.push(clone(a)); });
-    o.presetsVer = 4;
+  if (!(pv >= 5)) {
+    DEF_G_PRESETS.slice(0, 8).forEach(a => { if (!o.gPresets.some(p => p.name === a.name)) o.gPresets.push(clone(a)); });
+    o.presetsVer = 5;
   }
   o.gPresets.forEach(p => { if (p.asp == null) p.asp = 4; });
   fixMat(o.d);
