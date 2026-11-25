@@ -269,7 +269,7 @@ select{font-family:var(--sans);font-size:.78rem}
 <div class="toast" id="toast"></div>
 
 <script>
-const APP_VERSION = 'v03_2026-11-25.9';
+const APP_VERSION = 'v03_2026-11-25.10';
 document.querySelectorAll('.app-ver').forEach(el => el.textContent = APP_VERSION);
 
 const RHO = 1.2, NU = 15.1e-6, MMAQ = 9.80665;
@@ -543,10 +543,9 @@ function renderDuctRes() {
     [`摩擦損失 [${pu.u}/m]`, c ? fmt(c.R * pu.k, pu.u === 'Pa' ? 3 : 4) : '—', c && L.R ? (c.R <= L.R ? 'ok' : 'over') : ''],
     [`基準風量 [${UNIT_LBL[S.unit]}]`, base ? fmtN(Math.floor(toUnit(base))) : '—'],
     ['相当直径 [mm]', fmt(De, 0)],
-    null,
+    ['基準風量比 [%]', c && base ? fmt(Q / base * 100, 0) : '—', c && base ? (Q <= base * 1.0005 ? 'ok' : 'over') : ''],
     ['丸ダクト換算時風速 [m/s]', c && H ? fmt(vRound, 2) : '—'],
     ['断面積 [m²]', fmt(H ? W * H / 1e6 : Math.PI * W * W / 4e6, 4)],
-    ['基準風量比 [%]', c && base ? fmt(Q / base * 100, 0) : '—', c && base ? (Q <= base * 1.0005 ? 'ok' : 'over') : ''],
   ];
   if (t) items.push([`外形寸法（保温${t}）[mm]`, H ? `${W + 2 * t} x ${H + 2 * t}` : `${W + 2 * t}φ`, '', true]);
   $('d_res').innerHTML = resHTML(items);
@@ -588,10 +587,9 @@ function renderGrilleRes() {
     ['面風速 [m/s]', v ? fmt(v, 2) : '—', v && Vs ? (v <= Vs ? 'ok' : 'over') : ''],
     [`有効面積 [m²${per}]`, AeReq ? fmt(AeReq, 3) : '—'],
     [`基準風量 [${UNIT_LBL[S.unit]}${per}]`, baseQ ? fmtN(Math.floor(toUnit(baseQ))) : '—'],
-    null,
     ['選択サイズの面積 [m²]', fmt(A, 3)],
-    ['選択サイズの有効面積 [m²]', fmt(Ae, 3)],
     ['基準風量比 [%]', q1 && baseQ ? fmt(q1 / baseQ * 100, 0) : '—', q1 && baseQ ? (q1 <= baseQ * 1.0005 ? 'ok' : 'over') : ''],
+    ['選択サイズの有効面積 [m²]', fmt(Ae, 3)],
     ['必要台数', Q > 0 && baseQ ? Math.ceil(Q / baseQ - 1e-9) + ' 台' : '—'],
   ];
   $('g_res').innerHTML = resHTML(items);
