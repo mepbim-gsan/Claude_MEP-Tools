@@ -268,7 +268,7 @@ select{font-family:var(--sans);font-size:.78rem}
 <div class="toast" id="toast"></div>
 
 <script>
-const APP_VERSION = 'v03_2026-11-25.6';
+const APP_VERSION = 'v03_2026-11-25.7';
 document.querySelectorAll('.app-ver').forEach(el => el.textContent = APP_VERSION);
 
 const RHO = 1.2, NU = 15.1e-6, MMAQ = 9.80665;
@@ -284,25 +284,26 @@ const MATS = [
 ];
 // R は Pa/m で保持（0.10 mmAq/m = 0.980665 Pa/m）。pu はスタイルの表示単位
 const P01 = 0.980665, P03 = 2.941995;
+const P008 = 0.784532; // 0.08 mmAq/m
 const DEF_D_PRESETS = [
-  { name: '標準（低速）ダクト [Pa]',   mat: 'gi',   e: 0.18, V: 10, R: 1.0, asp: 4, pu: 'Pa' },
-  { name: '高速（排煙）ダクト [Pa]',   mat: 'gi',   e: 0.18, V: 15, R: 3.0, asp: 4, pu: 'Pa' },
-  { name: 'コンクリートダクト [Pa]',   mat: 'conc', e: 3.0,  V: 10, R: 3.0, asp: 4, pu: 'Pa' },
-  { name: 'グラスウールダクト [Pa]',   mat: 'gw',   e: 0.9,  V: 10, R: 1.0, asp: 4, pu: 'Pa' },
-  { name: '引抜鋼管 [Pa]',             mat: 'dsp',  e: 0.03, V: 10, R: 1.0, asp: 4, pu: 'Pa' },
-  { name: '塩ビダクト [Pa]',           mat: 'pvc',  e: 0.03, V: 10, R: 1.0, asp: 4, pu: 'Pa' },
-  { name: 'ステンレスダクト [Pa]',     mat: 'sus',  e: 0.18, V: 10, R: 1.0, asp: 4, pu: 'Pa' },
-  { name: '標準（低速）ダクト [mmAq]', mat: 'gi',   e: 0.18, V: 10, R: P01, asp: 4, pu: 'mmAq' },
-  { name: '高速（排煙）ダクト [mmAq]', mat: 'gi',   e: 0.18, V: 15, R: P03, asp: 4, pu: 'mmAq' },
-  { name: 'コンクリートダクト [mmAq]', mat: 'conc', e: 3.0,  V: 10, R: P03, asp: 4, pu: 'mmAq' },
-  { name: 'グラスウールダクト [mmAq]', mat: 'gw',   e: 0.9,  V: 10, R: P01, asp: 4, pu: 'mmAq' },
-  { name: '引抜鋼管 [mmAq]',           mat: 'dsp',  e: 0.03, V: 10, R: P01, asp: 4, pu: 'mmAq' },
-  { name: '低騒音（居室系）',          mat: 'gi',   e: 0.18, V: 6,  R: 0.8, asp: 4, pu: 'Pa' },
-  { name: '高速ダクト',                mat: 'gi',   e: 0.18, V: 20, R: 3.0, asp: 4, pu: 'Pa' },
-  { name: '排煙ダクト',                mat: 'gi',   e: 0.18, V: 20, R: '',  asp: 4, pu: 'Pa' },
+  { name: '標準（低速）ダクト [Pa]',       mat: 'gi',   e: 0.18, V: 10, R: 1.0,  asp: 4, pu: 'Pa' },
+  { name: '低騒音（居室系）ダクト [Pa]',   mat: 'gi',   e: 0.18, V: 6,  R: 0.8,  asp: 4, pu: 'Pa' },
+  { name: '高速（排煙）ダクト [Pa]',       mat: 'gi',   e: 0.18, V: 15, R: 3.0,  asp: 4, pu: 'Pa' },
+  { name: 'コンクリートダクト [Pa]',       mat: 'conc', e: 3.0,  V: 10, R: 3.0,  asp: 4, pu: 'Pa' },
+  { name: 'グラスウールダクト [Pa]',       mat: 'gw',   e: 0.9,  V: 10, R: 1.0,  asp: 4, pu: 'Pa' },
+  { name: '引抜鋼管 [Pa]',                 mat: 'dsp',  e: 0.03, V: 10, R: 1.0,  asp: 4, pu: 'Pa' },
+  { name: '塩ビダクト [Pa]',               mat: 'pvc',  e: 0.03, V: 10, R: 1.0,  asp: 4, pu: 'Pa' },
+  { name: 'ステンレスダクト [Pa]',         mat: 'sus',  e: 0.18, V: 10, R: 1.0,  asp: 4, pu: 'Pa' },
+  { name: '標準（低速）ダクト [mmAq]',     mat: 'gi',   e: 0.18, V: 10, R: P01,  asp: 4, pu: 'mmAq' },
+  { name: '低騒音（居室系）ダクト [mmAq]', mat: 'gi',   e: 0.18, V: 6,  R: P008, asp: 4, pu: 'mmAq' },
+  { name: '高速（排煙）ダクト [mmAq]',     mat: 'gi',   e: 0.18, V: 15, R: P03,  asp: 4, pu: 'mmAq' },
+  { name: 'コンクリートダクト [mmAq]',     mat: 'conc', e: 3.0,  V: 10, R: P03,  asp: 4, pu: 'mmAq' },
+  { name: 'グラスウールダクト [mmAq]',     mat: 'gw',   e: 0.9,  V: 10, R: P01,  asp: 4, pu: 'mmAq' },
+  { name: '引抜鋼管 [mmAq]',               mat: 'dsp',  e: 0.03, V: 10, R: P01,  asp: 4, pu: 'mmAq' },
 ];
-// 既存ユーザーには名前が無いものだけ追記（標準（低速）[Pa] は旧「標準（低速）ダクト」と同値のため除外）
-const ADD_D_PRESETS_2 = DEF_D_PRESETS.slice(1, 12);
+// 旧初期スタイルの整理（v03_2026-11-25.7）: 改名・廃止
+const D_RENAME = { '標準（低速）ダクト': '標準（低速）ダクト [Pa]', '低騒音（居室系）': '低騒音（居室系）ダクト [Pa]' };
+const D_REMOVE = ['高速ダクト', '排煙ダクト'];
 const DEF_G_PRESETS = [
   { name: 'VHS - 75% - 2.5m/s',          ratio: 75, V: 2.5, asp: 4 },
   { name: 'HS - 75% - 2.0m/s',           ratio: 75, V: 2.0, asp: 4 },
@@ -330,7 +331,7 @@ const DEF = {
   dPresets: DEF_D_PRESETS, gPresets: DEF_G_PRESETS,
   d: { preset: 0, R: 1.0, V: 10, mat: 'gi', e: 0.18, pu: 'Pa', Hmax: '', asp: 4, step: 50, rstep: 25, ins: 0 },
   g: { preset: 0, ratio: 35, V: 2.5, n: 1, Hmax: '', asp: 4, step: 50 },
-  memo: [], memoSeq: {}, presetsVer: 5,
+  memo: [], memoSeq: {}, presetsVer: 6,
 };
 let S;
 try { S = JSON.parse(localStorage.getItem('ductsize') || 'null'); } catch (e) { S = null; }
@@ -346,14 +347,22 @@ function normalize(o) {
     if (old) x.e = old.e; else if (x.e == null || x.e === '') x.e = 0.18;
     x.mat = x.mat === 'other' || old ? 'other' : 'gi';
   };
-  if (!(pv >= 3)) {
-    ADD_D_PRESETS_2.forEach(a => { if (!o.dPresets.some(p => p.name === a.name)) o.dPresets.push(clone(a)); });
-    o.presetsVer = 3;
+  if (!(pv >= 6)) {
+    const cur = (o.dPresets[o.d.preset] || {}).name;
+    const has = n => o.dPresets.some(p => p.name === n);
+    o.dPresets.forEach(p => { const nn = D_RENAME[p.name]; if (nn && !has(nn)) p.name = nn; });
+    o.dPresets = o.dPresets.filter(p => !D_REMOVE.includes(p.name));
+    DEF_D_PRESETS.forEach(a => { if (!has(a.name)) o.dPresets.push(clone(a)); });
+    const ord = p => { const i = DEF_D_PRESETS.findIndex(d => d.name === p.name); return i < 0 ? 999 : i; };
+    o.dPresets = o.dPresets.map((p, i) => [p, i]).sort((x, y) => ord(x[0]) - ord(y[0]) || x[1] - y[1]).map(x => x[0]);
+    const curName = D_RENAME[cur] || cur;
+    o.d.preset = o.dPresets.findIndex(p => p.name === curName);
+    o.presetsVer = 6;
   }
   o.dPresets.forEach(p => { fixMat(p); if (p.asp == null) p.asp = 4; if (!p.pu) p.pu = o.d.pu || 'Pa'; });
   if (!(pv >= 5)) {
     DEF_G_PRESETS.slice(0, 8).forEach(a => { if (!o.gPresets.some(p => p.name === a.name)) o.gPresets.push(clone(a)); });
-    o.presetsVer = 5;
+    o.presetsVer = Math.max(o.presetsVer || 0, 5);
   }
   o.gPresets.forEach(p => { if (p.asp == null) p.asp = 4; });
   fixMat(o.d);
