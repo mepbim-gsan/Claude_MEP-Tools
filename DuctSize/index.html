@@ -57,6 +57,7 @@ select{font-family:var(--sans);font-size:.78rem}
 .res .v{font-family:var(--mono);font-size:.84rem;font-weight:500;white-space:nowrap}
 .res .v.ok{color:var(--green)}.res .v.over{color:var(--red)}
 .res .full{grid-column:1/-1}
+.res>div.sp{border:none}
 .stp{width:34px;height:32px;border:1.5px solid var(--bd);border-radius:7px;background:var(--sf2);font-size:1.05rem;color:var(--tx2);cursor:pointer;-webkit-tap-highlight-color:transparent}
 .stp:active{background:var(--accent);color:#fff}
 #g_n{width:56px;text-align:center}
@@ -81,6 +82,23 @@ select{font-family:var(--sans);font-size:.78rem}
 .io .btn{padding:4px 8px;font-size:.7rem}
 .mfoot{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
 .mfoot .btn{padding:9px 4px;font-size:.84rem}
+.maddrow{display:flex;gap:4px;margin-bottom:6px}.maddrow input{flex:1;font-family:var(--sans);font-size:.8rem;padding:5px 8px}
+.maddrow .btn{padding:5px 10px;font-size:.74rem}
+.btn.pri{background:var(--accent);border-color:var(--accent);color:#fff}
+.mitem{position:relative;overflow:hidden;border-bottom:1px dashed var(--bd);cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:pan-y}
+.mbody{padding:5px 2px;background:var(--surface);transition:transform .18s;position:relative;z-index:1}
+.mitem:active .mbody{background:var(--accent-l)}
+.mitem.open .mbody{transform:translateX(-72px)}
+.mdel{position:absolute;top:0;right:0;bottom:0;width:72px;border:none;background:var(--red);color:#fff;font-family:var(--sans);font-size:.76rem;font-weight:700;cursor:pointer}
+.m1{display:flex;align-items:center;gap:8px}
+.mname{font-size:.8rem;font-weight:700;color:var(--tx);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-decoration:underline dotted var(--tx3)}
+.mren{flex:1;min-width:0;font-family:var(--sans);font-size:.8rem;padding:2px 6px}
+.mq{font-family:var(--mono);font-size:.74rem;color:var(--tx2);white-space:nowrap}
+.msz{font-family:var(--mono);font-size:.86rem;font-weight:500;color:var(--accent);white-space:nowrap;min-width:72px;text-align:right}
+.m2{display:flex;justify-content:space-between;gap:8px;font-size:.64rem;color:var(--tx3);margin-top:1px}
+.m2 span:last-child{font-family:var(--mono);white-space:nowrap}
+.m2 .ok{color:var(--green)}.m2 .over{color:var(--red)}
+.mempty{font-size:.66rem;color:var(--tx3);padding:4px 2px 0}
 .ver a{color:var(--tx3)}
 .ver{text-align:center;font-size:.62rem;color:var(--tx3);font-family:var(--mono);margin-top:6px}
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--tx);color:#fff;font-size:.78rem;padding:8px 14px;border-radius:20px;opacity:0;transition:opacity .2s;pointer-events:none}
@@ -142,6 +160,12 @@ select{font-family:var(--sans);font-size:.78rem}
     </span><button class="btn act" id="d_copy1">コピー</button></h2>
     <div class="res" id="d_res"></div>
   </div>
+
+  <div class="card">
+    <h2>メモリ <span class="sub" id="d_mcnt"></span><button class="btn act" id="d_mall">全コピー</button><button class="btn" id="d_mclr">全削除</button></h2>
+    <div class="maddrow"><input id="d_mname" type="text" placeholder="名前（空欄で連番）"><button class="btn pri" id="d_madd">＋メモリ</button></div>
+    <div class="mlist" id="d_mlist"></div>
+  </div>
 </div>
 
 <!-- ══ GRILLE ══ -->
@@ -158,6 +182,12 @@ select{font-family:var(--sans);font-size:.78rem}
       <input id="g_H" type="number" inputmode="numeric" placeholder="H">
     </span><button class="btn act" id="g_copy1">コピー</button></h2>
     <div class="res" id="g_res"></div>
+  </div>
+
+  <div class="card">
+    <h2>メモリ <span class="sub" id="g_mcnt"></span><button class="btn act" id="g_mall">全コピー</button><button class="btn" id="g_mclr">全削除</button></h2>
+    <div class="maddrow"><input id="g_mname" type="text" placeholder="名前（空欄で連番）"><button class="btn pri" id="g_madd">＋メモリ</button></div>
+    <div class="mlist" id="g_mlist"></div>
   </div>
 </div>
 
@@ -209,6 +239,7 @@ select{font-family:var(--sans);font-size:.78rem}
         <label>ダクト材質</label><select id="md_mat"></select>
         <label>内面粗度 [mm]</label><input id="md_e" class="num" type="number" step="0.01" inputmode="decimal">
         <label>最大ダクト内風速 [m/s]</label><input id="md_V" class="num" type="number" step="0.5" inputmode="decimal" placeholder="制限なし">
+        <label>圧力単位</label><select id="md_pu"><option value="Pa">Pa</option><option value="mmAq">mmAq</option></select>
         <label id="md_Rlbl">摩擦損失 [Pa/m]</label><input id="md_R" class="num" type="number" step="0.1" inputmode="decimal" placeholder="制限なし">
         <label>アスペクト比</label><input id="md_asp" class="num" type="number" step="0.5" inputmode="decimal">
       </div>
@@ -224,7 +255,6 @@ select{font-family:var(--sans);font-size:.78rem}
         <label>高さ上限 [mm]</label><input id="md_Hmax" class="num" type="number" step="50" inputmode="numeric" placeholder="なし">
         <label>角ダクト刻み [mm]</label><select id="md_step"><option>25</option><option>50</option><option>100</option></select>
         <label>丸ダクト刻み [mm]</label><select id="md_rstep"><option>25</option><option>50</option></select>
-        <label>圧力単位</label><select id="md_pu"><option value="Pa">Pa</option><option value="mmAq">mmAq</option></select>
         <label>保温厚 [mm]</label><select id="md_ins"><option value="0">なし</option><option>25</option><option>40</option><option>50</option></select>
       </div>
       <div class="mgrid only-g">
@@ -239,25 +269,51 @@ select{font-family:var(--sans);font-size:.78rem}
 <div class="toast" id="toast"></div>
 
 <script>
-const APP_VERSION = 'v02_2026-11-18.5';
+const APP_VERSION = 'v03_2026-11-25.10';
 document.querySelectorAll('.app-ver').forEach(el => el.textContent = APP_VERSION);
 
 const RHO = 1.2, NU = 15.1e-6, MMAQ = 9.80665;
 const MATS = [
   { id: 'gi',   name: '亜鉛鉄板',             e: 0.18 },
-  { id: 'sus',  name: 'ステンレス',           e: 0.05 },
-  { id: 'pvc',  name: '塩ビ',                 e: 0.01 },
+  { id: 'sus',  name: 'ステンレス鋼板',       e: 0.18 },
+  { id: 'pvc',  name: '塩化ビニル',           e: 0.03 },
+  { id: 'dsp',  name: '引抜鋼管',             e: 0.03 },
   { id: 'gw',   name: 'グラスウールダクト',   e: 0.9  },
   { id: 'flex', name: 'フレキシブル（伸長）', e: 3.0  },
+  { id: 'conc', name: 'コンクリート',         e: 3.0  },
   { id: 'other', name: 'その他',              e: null },
 ];
+// R は Pa/m で保持（0.10 mmAq/m = 0.980665 Pa/m）。pu はスタイルの表示単位
+const P01 = 0.980665, P03 = 2.941995;
+const P008 = 0.784532; // 0.08 mmAq/m
 const DEF_D_PRESETS = [
-  { name: '標準（低速）ダクト', mat: 'gi', e: 0.18, V: 10, R: 1.0, asp: 4 },
-  { name: '低騒音（居室系）',   mat: 'gi', e: 0.18, V: 6,  R: 0.8, asp: 4 },
-  { name: '高速ダクト',         mat: 'gi', e: 0.18, V: 20, R: 3.0, asp: 4 },
-  { name: '排煙ダクト',         mat: 'gi', e: 0.18, V: 20, R: '',  asp: 4 },
+  { name: '標準（低速）ダクト [Pa]',       mat: 'gi',   e: 0.18, V: 10, R: 1.0,  asp: 4, pu: 'Pa' },
+  { name: '低騒音（居室系）ダクト [Pa]',   mat: 'gi',   e: 0.18, V: 6,  R: 0.8,  asp: 4, pu: 'Pa' },
+  { name: '高速（排煙）ダクト [Pa]',       mat: 'gi',   e: 0.18, V: 15, R: 3.0,  asp: 4, pu: 'Pa' },
+  { name: 'コンクリートダクト [Pa]',       mat: 'conc', e: 3.0,  V: 10, R: 3.0,  asp: 4, pu: 'Pa' },
+  { name: 'グラスウールダクト [Pa]',       mat: 'gw',   e: 0.9,  V: 10, R: 1.0,  asp: 4, pu: 'Pa' },
+  { name: '引抜鋼管 [Pa]',                 mat: 'dsp',  e: 0.03, V: 10, R: 1.0,  asp: 4, pu: 'Pa' },
+  { name: '塩ビダクト [Pa]',               mat: 'pvc',  e: 0.03, V: 10, R: 1.0,  asp: 4, pu: 'Pa' },
+  { name: 'ステンレスダクト [Pa]',         mat: 'sus',  e: 0.18, V: 10, R: 1.0,  asp: 4, pu: 'Pa' },
+  { name: '標準（低速）ダクト [mmAq]',     mat: 'gi',   e: 0.18, V: 10, R: P01,  asp: 4, pu: 'mmAq' },
+  { name: '低騒音（居室系）ダクト [mmAq]', mat: 'gi',   e: 0.18, V: 6,  R: P008, asp: 4, pu: 'mmAq' },
+  { name: '高速（排煙）ダクト [mmAq]',     mat: 'gi',   e: 0.18, V: 15, R: P03,  asp: 4, pu: 'mmAq' },
+  { name: 'コンクリートダクト [mmAq]',     mat: 'conc', e: 3.0,  V: 10, R: P03,  asp: 4, pu: 'mmAq' },
+  { name: 'グラスウールダクト [mmAq]',     mat: 'gw',   e: 0.9,  V: 10, R: P01,  asp: 4, pu: 'mmAq' },
+  { name: '引抜鋼管 [mmAq]',               mat: 'dsp',  e: 0.03, V: 10, R: P01,  asp: 4, pu: 'mmAq' },
 ];
+// 旧初期スタイルの整理（v03_2026-11-25.7）: 改名・廃止
+const D_RENAME = { '標準（低速）ダクト': '標準（低速）ダクト [Pa]', '低騒音（居室系）': '低騒音（居室系）ダクト [Pa]' };
+const D_REMOVE = ['高速ダクト', '排煙ダクト'];
 const DEF_G_PRESETS = [
+  { name: 'VHS - 75% - 2.5m/s',          ratio: 75, V: 2.5, asp: 4 },
+  { name: 'HS - 75% - 2.0m/s',           ratio: 75, V: 2.0, asp: 4 },
+  { name: 'OAG - 35% - 2.0m/s',          ratio: 35, V: 2.0, asp: 4 },
+  { name: 'EAG - 35% - 2.5m/s',          ratio: 35, V: 2.5, asp: 4 },
+  { name: 'RAG - 50% - 2.0m/s',          ratio: 50, V: 2.0, asp: 4 },
+  { name: 'SEG - 35% - 7.0m/s',          ratio: 35, V: 7.0, asp: 4 },
+  { name: '排煙口 - 90% - 8.0m/s',       ratio: 90, V: 8.0, asp: 4 },
+  { name: 'DG - 60% - 1.0m/s',           ratio: 60, V: 1.0, asp: 4 },
   { name: 'OA/EA ガラリ - 35% - 2.5m/s', ratio: 35, V: 2.5, asp: 4 },
   { name: 'OA/EA ガラリ - 35% - 3.0m/s', ratio: 35, V: 3.0, asp: 4 },
   { name: '吹出口 VHS - 70% - 3.0m/s',   ratio: 70, V: 3.0, asp: 4 },
@@ -275,11 +331,13 @@ const DEF = {
   q: '5000', unit: 'h', tab: 'duct',
   dPresets: DEF_D_PRESETS, gPresets: DEF_G_PRESETS,
   d: { preset: 0, R: 1.0, V: 10, mat: 'gi', e: 0.18, pu: 'Pa', Hmax: '', asp: 4, step: 50, rstep: 25, ins: 0 },
-  g: { preset: 0, ratio: 35, V: 2.5, n: 1, Hmax: '', asp: 4, step: 50 },
+  g: { preset: 0, ratio: 75, V: 2.5, n: 1, Hmax: '', asp: 4, step: 50 },
+  memo: [], memoSeq: {}, presetsVer: 6,
 };
 let S;
 try { S = JSON.parse(localStorage.getItem('ductsize') || 'null'); } catch (e) { S = null; }
 function normalize(o) {
+  const pv = o && o.presetsVer;
   o = Object.assign(clone(DEF), o || {});
   o.d = Object.assign(clone(DEF.d), o.d); o.g = Object.assign(clone(DEF.g), o.g);
   ['dPresets', 'gPresets'].forEach(k => { if (!Array.isArray(o[k]) || !o[k].length) o[k] = clone(DEF[k]); });
@@ -290,9 +348,27 @@ function normalize(o) {
     if (old) x.e = old.e; else if (x.e == null || x.e === '') x.e = 0.18;
     x.mat = x.mat === 'other' || old ? 'other' : 'gi';
   };
-  o.dPresets.forEach(p => { fixMat(p); if (p.asp == null) p.asp = 4; });
+  if (!(pv >= 6)) {
+    const cur = (o.dPresets[o.d.preset] || {}).name;
+    const has = n => o.dPresets.some(p => p.name === n);
+    o.dPresets.forEach(p => { const nn = D_RENAME[p.name]; if (nn && !has(nn)) p.name = nn; });
+    o.dPresets = o.dPresets.filter(p => !D_REMOVE.includes(p.name));
+    DEF_D_PRESETS.forEach(a => { if (!has(a.name)) o.dPresets.push(clone(a)); });
+    const ord = p => { const i = DEF_D_PRESETS.findIndex(d => d.name === p.name); return i < 0 ? 999 : i; };
+    o.dPresets = o.dPresets.map((p, i) => [p, i]).sort((x, y) => ord(x[0]) - ord(y[0]) || x[1] - y[1]).map(x => x[0]);
+    const curName = D_RENAME[cur] || cur;
+    o.d.preset = o.dPresets.findIndex(p => p.name === curName);
+    o.presetsVer = 6;
+  }
+  o.dPresets.forEach(p => { fixMat(p); if (p.asp == null) p.asp = 4; if (!p.pu) p.pu = o.d.pu || 'Pa'; });
+  if (!(pv >= 5)) {
+    DEF_G_PRESETS.slice(0, 8).forEach(a => { if (!o.gPresets.some(p => p.name === a.name)) o.gPresets.push(clone(a)); });
+    o.presetsVer = Math.max(o.presetsVer || 0, 5);
+  }
   o.gPresets.forEach(p => { if (p.asp == null) p.asp = 4; });
   fixMat(o.d);
+  if (!Array.isArray(o.memo)) o.memo = [];
+  if (!o.memoSeq || typeof o.memoSeq !== 'object') o.memoSeq = {};
   delete o.mats;
   return o;
 }
@@ -426,8 +502,8 @@ function renderCands(el, list, sel, onPick) {
 }
 
 function resHTML(items) {
-  return items.map(([k, v, cls, full]) =>
-    `<div${full ? ' class="full"' : ''}><div class="k">${k}</div><div class="v ${cls || ''}">${v}</div></div>`).join('');
+  return items.map(it => !it ? '<div class="sp"></div>' : it).map(it => typeof it === 'string' ? it : (([k, v, cls, full]) =>
+    `<div${full ? ' class="full"' : ''}><div class="k">${k}</div><div class="v ${cls || ''}">${v}</div></div>`)(it)).join('');
 }
 
 const PU = () => S.d.pu === 'mmAq' ? { k: 1 / MMAQ, u: 'mmAq' } : { k: 1, u: 'Pa' };
@@ -456,24 +532,21 @@ function renderDuctRes() {
   const L = ductLimits();
   const base = ductBaseQ(W, H, L), pu = PU();
   const t = +S.d.ins;
-  const items = [];
-  if (Q > 0) {
-    const c = ductCheck(Q, W, H, L);
-    const vRound = Q / 3600 / (Math.PI * c.De * c.De / 4e6);
-    items.push(
-      ['風速 [m/s]', fmt(c.v, 2), L.V ? (c.v <= L.V ? 'ok' : 'over') : ''],
-      [`摩擦損失 [${pu.u}/m]`, fmt(c.R * pu.k, pu.u === 'Pa' ? 3 : 4), L.R ? (c.R <= L.R ? 'ok' : 'over') : ''],
-      [`動圧 [${pu.u}]`, fmt(RHO * c.v * c.v / 2 * pu.k, pu.u === 'Pa' ? 1 : 2)],
-      ['丸換算風速 [m/s]', H ? fmt(vRound, 2) : '—'],
-    );
-  }
-  items.push(
+  const De = H ? deRect(W, H) : W;
+  const c = Q > 0 ? ductCheck(Q, W, H, L) : null;
+  const vRound = c ? Q / 3600 / (Math.PI * De * De / 4e6) : null;
+  // PC アプリ版と同じ並び（2列・行順）。以降は追加項目
+  const items = [
     ['アスペクト比', H ? fmt(Math.max(W, H) / Math.min(W, H), 2) : '—'],
-    ['相当直径 [mm]', fmt(H ? deRect(W, H) : W, 0)],
-    [`基準風量 [${UNIT_LBL[S.unit]}]`, base ? fmtN(toUnit(base)) : '—'],
+    ['風速 [m/s]', c ? fmt(c.v, 2) : '—', c && L.V ? (c.v <= L.V ? 'ok' : 'over') : ''],
+    [`動圧 [${pu.u}]`, c ? fmt(RHO * c.v * c.v / 2 * pu.k, pu.u === 'Pa' ? 2 : 3) : '—'],
+    [`摩擦損失 [${pu.u}/m]`, c ? fmt(c.R * pu.k, pu.u === 'Pa' ? 3 : 4) : '—', c && L.R ? (c.R <= L.R ? 'ok' : 'over') : ''],
+    [`基準風量 [${UNIT_LBL[S.unit]}]`, base ? fmtN(Math.floor(toUnit(base))) : '—'],
+    ['相当直径 [mm]', fmt(De, 0)],
+    ['基準風量比 [%]', c && base ? fmt(Q / base * 100, 0) : '—', c && base ? (Q <= base * 1.0005 ? 'ok' : 'over') : ''],
+    ['丸ダクト換算時風速 [m/s]', c && H ? fmt(vRound, 2) : '—'],
     ['断面積 [m²]', fmt(H ? W * H / 1e6 : Math.PI * W * W / 4e6, 4)],
-  );
-  if (Q > 0 && base) items.push(['基準風量比 [%]', fmt(Q / base * 100, 0), Q <= base * 1.0005 ? 'ok' : 'over']);
+  ];
   if (t) items.push([`外形寸法（保温${t}）[mm]`, H ? `${W + 2 * t} x ${H + 2 * t}` : `${W + 2 * t}φ`, '', true]);
   $('d_res').innerHTML = resHTML(items);
 }
@@ -500,26 +573,29 @@ function renderGrilleRes() {
   const W = num($('g_W').value), H = num($('g_H').value), Q = getQ();
   if (!W) { $('g_res').innerHTML = resHTML([['サイズを入力するか、候補をタップしてください', '', '', true]]); return; }
   const ratio = num(S.g.ratio), Vs = num(S.g.V);
-  const n = Math.max(1, Math.floor(num(S.g.n) || 1));
+  const n = Math.max(1, Math.floor(num(S.g.n) || 1)), per = n > 1 ? '/台' : '';
   const A = H ? W * H / 1e6 : Math.PI * W * W / 4e6;
   const Ae = ratio ? A * ratio / 100 : null;
+  const q1 = Q > 0 ? Q / n : null;
+  const v = q1 && Ae ? q1 / 3600 / Ae : null;
+  const AeReq = q1 && Vs ? q1 / 3600 / Vs : null;
+  const baseQ = Ae && Vs ? Ae * Vs * 3600 : null;
+  // PC アプリ版と同じ並び（開口率・必要／面風速・有効／基準風量）。以降は追加項目
   const items = [
     ['開口率 [%]', ratio ? String(ratio) : '—'],
-    ['面積 [m²]', fmt(A, 3)],
-    ['有効面積 [m²]', fmt(Ae, 3)],
-    [`基準風量 [${UNIT_LBL[S.unit]}/台]`, Ae && Vs ? fmtN(toUnit(Ae * Vs * 3600)) : '—'],
+    [`必要面積 [m²${per}]`, AeReq && ratio ? fmt(AeReq / (ratio / 100), 3) : '—'],
+    ['面風速 [m/s]', v ? fmt(v, 2) : '—', v && Vs ? (v <= Vs ? 'ok' : 'over') : ''],
+    [`有効面積 [m²${per}]`, AeReq ? fmt(AeReq, 3) : '—'],
+    [`基準風量 [${UNIT_LBL[S.unit]}${per}]`, baseQ ? fmtN(Math.floor(toUnit(baseQ))) : '—'],
+    ['選択サイズの面積 [m²]', fmt(A, 3)],
+    ['基準風量比 [%]', q1 && baseQ ? fmt(q1 / baseQ * 100, 0) : '—', q1 && baseQ ? (q1 <= baseQ * 1.0005 ? 'ok' : 'over') : ''],
+    ['選択サイズの有効面積 [m²]', fmt(Ae, 3)],
+    ['必要台数', Q > 0 && baseQ ? Math.ceil(Q / baseQ - 1e-9) + ' 台' : '—'],
   ];
-  if (Q > 0 && Ae) {
-    const v = Q / n / 3600 / Ae;
-    items.splice(1, 0, ['面風速 [m/s]', fmt(v, 2), Vs ? (v <= Vs ? 'ok' : 'over') : '']);
-    if (Vs) items.push(['基準風量比 [%]', fmt(Q / n / (Ae * Vs * 3600) * 100, 0), Q / n <= Ae * Vs * 3600 * 1.0005 ? 'ok' : 'over']);
-    items.push(['必要台数', Vs ? Math.ceil(Q / 3600 / (Ae * Vs) - 1e-9) + ' 台' : '—'],
-               ['必要面積 [m²/台]', Vs ? fmt(Q / n / 3600 / Vs / (ratio / 100), 3) : '—']);
-  }
   $('g_res').innerHTML = resHTML(items);
 }
 
-function renderAll() { renderDuct(); renderGrille(); }
+function renderAll() { renderDuct(); renderGrille(); renderMemo(); }
 
 /* ── コピー ── */
 function copy(text) {
@@ -544,13 +620,15 @@ $('g_copy1').onclick = () => copy(qText() + '\nサイズ\t' + $('g_W').value + (
 const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const grpOf = () => S.tab === 'grille' ? 'g' : 'd';
 const presets = grp => grp === 'd' ? S.dPresets : S.gPresets;
-const SF = { d: { mat: 'md_mat', e: 'md_e', V: 'md_V', R: 'md_R', asp: 'md_asp' }, g: { ratio: 'mg_ratio', V: 'mg_V', asp: 'mg_asp' } };
-const CF = { d: { Hmax: 'md_Hmax', step: 'md_step', rstep: 'md_rstep', ins: 'md_ins', pu: 'md_pu' }, g: { Hmax: 'mg_Hmax', step: 'mg_step' } };
+const SF = { d: { pu: 'md_pu', mat: 'md_mat', e: 'md_e', V: 'md_V', R: 'md_R', asp: 'md_asp' }, g: { ratio: 'mg_ratio', V: 'mg_V', asp: 'mg_asp' } };
+const CF = { d: { Hmax: 'md_Hmax', step: 'md_step', rstep: 'md_rstep', ins: 'md_ins' }, g: { Hmax: 'mg_Hmax', step: 'mg_step' } };
 const same = (a, b) => String(a ?? '') === String(b ?? '');
 const styleOf = grp => Object.fromEntries(Object.keys(SF[grp]).map(k => [k, S[grp][k]]));
+// 選択中のスタイルと計算値が一致しなければ、値が一致する別スタイルを選ぶ（無ければカスタム）
 function matchPreset(grp) {
-  const i = +S[grp].preset, p = presets(grp)[i];
-  if (!p || !Object.keys(SF[grp]).every(k => same(p[k], S[grp][k]))) S[grp].preset = -1;
+  const eq = p => p && Object.keys(SF[grp]).every(k => same(p[k], S[grp][k]));
+  if (eq(presets(grp)[+S[grp].preset])) return;
+  S[grp].preset = presets(grp).findIndex(eq);
 }
 function fillMain() {
   ['d', 'g'].forEach(grp => {
@@ -571,6 +649,7 @@ function fillMain() {
 }));
 MATS.forEach(m => $('md_mat').add(new Option(m.name, m.id)));
 $('m_mat').innerHTML = MATS.filter(m => m.e != null).map(m => `<tr><td>${esc(m.name)}</td><td>${m.e}</td></tr>`).join('');
+matchPreset('d'); matchPreset('g'); save();
 fillMain();
 function setN(n) {
   n = Math.max(1, Math.floor(n) || 1);
@@ -598,7 +677,7 @@ function mSetForm(vals, fields) {
     if (k === 'R') Rorig = vals.R;
     $(id).value = (k === 'R' && vals.R !== '' && $('md_pu').value === 'mmAq') ? r4(vals.R / MMAQ) : vals[k];
   });
-  mMatLock(); mRLabel();
+  mMatLock(); mRLabel(); puPrev = $('md_pu').value;
 }
 function mGetForm(fields) {
   return Object.fromEntries(Object.entries(fields).map(([k, id]) => {
@@ -717,9 +796,10 @@ $('impf').onchange = async () => {
   save(); closeModal(); fillMain(); renderAll(); toast('読み込みました');
 };
 $('rst').onclick = () => {
-  if (!confirm('スタイル・設定をすべて初期状態に戻しますか？')) return;
+  if (!confirm('スタイル・設定をすべて初期状態に戻しますか？（メモリは残ります）')) return;
   const tab = S.tab;
-  S = normalize(null); S.tab = tab;
+  const memo = S.memo, memoSeq = S.memoSeq;
+  S = normalize(null); S.tab = tab; S.memo = memo; S.memoSeq = memoSeq;
   save(); closeModal(); fillMain(); renderAll(); toast('初期化しました');
 };
 
@@ -754,6 +834,140 @@ $('manual-link').onclick = e => {
 };
 if (S.tab === 'manual') S.tab = 'duct';
 document.querySelector(`.tab-btn[data-tab="${S.tab}"]`)?.click();
+/* ── メモリ ── */
+const PNAME = grp => { const p = presets(grp)[+S[grp].preset]; return p ? p.name : '（カスタム）'; };
+function memoResult(m) {
+  const Q = m.qh;
+  if (m.t === 'd') {
+    const st = m.st, mat = MATS.find(x => x.id === st.mat) || MATS[0];
+    const L = { R: num(st.R), V: num(st.V), e: isFinite(parseFloat(st.e)) ? parseFloat(st.e) : (mat.e ?? 0.18), mat };
+    const c = ductCheck(Q, m.W, m.H, L), base = ductBaseQ(m.W, m.H, L);
+    return { v: c.v, R: c.R, ratio: base ? Q / base * 100 : null, okV: !L.V || c.v <= L.V, okR: !L.R || c.R <= L.R };
+  }
+  const ratio = num(m.st.ratio), Vs = num(m.st.V), n = Math.max(1, +m.n || 1);
+  const A = m.H ? m.W * m.H / 1e6 : Math.PI * m.W * m.W / 4e6, Ae = ratio ? A * ratio / 100 : null;
+  const v = Ae ? Q / n / 3600 / Ae : null;
+  return { v, ratio: Ae && Vs ? Q / n / (Ae * Vs * 3600) * 100 : null, okV: !Vs || v <= Vs };
+}
+const memoSize = m => m.H ? `${m.W}x${m.H}` : `${m.W}φ`;
+function memoLine(m) {
+  const r = memoResult(m), pu = PU();
+  if (m.t === 'd') return [`${fmt(r.v, 2)}m/s`, `${fmt(r.R * pu.k, pu.u === 'Pa' ? 3 : 4)}${pu.u}/m`, r.ratio ? fmt(r.ratio, 0) + '%' : ''].filter(Boolean);
+  return [`${m.n}台`, `${fmt(r.v, 2)}m/s`, r.ratio ? fmt(r.ratio, 0) + '%' : ''].filter(Boolean);
+}
+function renderMemo() {
+  ['d', 'g'].forEach(t => {
+    const list = S.memo.filter(m => m.t === t);
+    $(t + '_mcnt').textContent = list.length ? `${list.length}件` : '';
+    $(t + '_mlist').innerHTML = list.length ? list.map(m => {
+      const r = memoResult(m), ln = memoLine(m), ok = r.okV && (r.okR !== false);
+      return `<div class="mitem" data-id="${m.id}">
+        <button class="mdel" data-del="${m.id}">削除</button>
+        <div class="mbody">
+          <div class="m1"><span class="mname" data-ren="${m.id}">${esc(m.name)}</span><span class="mq">${fmtN(m.q)} ${UNIT_LBL[m.unit]}</span><span class="msz">${memoSize(m)}</span></div>
+          <div class="m2"><span>${esc(m.pname)}</span><span class="${ok ? 'ok' : 'over'}">${ln.join(' ／ ')}</span></div>
+        </div>
+      </div>`;
+    }).join('') + '<div class="mempty">行タップで呼び出し・名前タップで変更・左スワイプ（PC は右クリック）で削除</div>' : '<div class="mempty">「＋メモリ」で現在のサイズと条件を記録できます</div>';
+  });
+}
+function memoAdd(t) {
+  const Wid = t + '_W', Hid = t + '_H';
+  const W = num($(Wid).value), H = num($(Hid).value), qh = getQ();
+  if (!(qh > 0)) { toast('風量を入力してください'); return; }
+  if (!W) { toast('サイズを選択してください'); return; }
+  const cnt = S.memo.filter(m => m.t === t).length;
+  const name = $(t + '_mname').value.trim() || `No.${(S.memoSeq[t] = (S.memoSeq[t] || cnt) + 1)}`;
+  const st = styleOf(t);
+  S.memo.unshift({
+    id: 'm' + Date.now(), t, name, q: +toUnit(qh).toFixed(2), unit: S.unit, qh, W, H: H || null,
+    pname: PNAME(t), st, n: t === 'g' ? Math.max(1, Math.floor(num(S.g.n) || 1)) : undefined,
+  });
+  $(t + '_mname').value = '';
+  save(); renderMemo(); toast('メモリに記録しました');
+}
+function memoRestore(m) {
+  const t = m.t;
+  S.unit = m.unit; S.q = String(m.q);
+  Object.assign(S[t], m.st);
+  if (t === 'g') S.g.n = m.n;
+  const idx = presets(t).findIndex(p => p.name === m.pname);
+  S[t].preset = idx; matchPreset(t);
+  $(t + '_W').value = m.W; $(t + '_H').value = m.H || '';
+  if (t === 'd') { dAuto = false; dSel = { W: m.W, H: m.H }; } else { gAuto = false; gSel = { W: m.W, H: m.H }; }
+  save(); fillMain(); renderAll(); renderMemo();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+  toast(`「${m.name}」を呼び出しました`);
+}
+['d', 'g'].forEach(t => {
+  $(t + '_madd').onclick = () => memoAdd(t);
+  $(t + '_mname').addEventListener('keydown', e => { if (e.key === 'Enter') memoAdd(t); });
+  $(t + '_mclr').onclick = () => {
+    if (!S.memo.some(m => m.t === t)) return;
+    if (!confirm('この画面のメモリをすべて削除しますか？')) return;
+    S.memo = S.memo.filter(m => m.t !== t); S.memoSeq[t] = 0;
+    save(); renderMemo();
+  };
+  $(t + '_mall').onclick = () => {
+    const list = S.memo.filter(m => m.t === t);
+    if (!list.length) return;
+    const pu = PU();
+    const head = t === 'd'
+      ? ['名前', '風量', '単位', 'サイズ', 'スタイル', `摩擦損失上限[${pu.u}/m]`, '風速上限[m/s]', 'ε[mm]', '風速[m/s]', `摩擦損失[${pu.u}/m]`, '基準風量比[%]']
+      : ['名前', '風量', '単位', '台数', 'サイズ', 'スタイル', '開口率[%]', '面風速上限[m/s]', '面風速[m/s]', '基準風量比[%]'];
+    const rows = list.map(m => {
+      const r = memoResult(m);
+      return t === 'd'
+        ? [m.name, m.q, UNIT_LBL[m.unit], memoSize(m), m.pname, m.st.R === '' ? '' : +(m.st.R * pu.k).toFixed(4), m.st.V, m.st.e, fmt(r.v, 2), fmt(r.R * pu.k, 4), fmt(r.ratio, 0)]
+        : [m.name, m.q, UNIT_LBL[m.unit], m.n, memoSize(m), m.pname, m.st.ratio, m.st.V, fmt(r.v, 2), fmt(r.ratio, 0)];
+    });
+    copy([head, ...rows].map(r => r.join('\t')).join('\n'));
+  };
+  const list = $(t + '_mlist');
+  const closeAll = except => list.querySelectorAll('.mitem.open').forEach(x => { if (x !== except) x.classList.remove('open'); });
+  let sx = 0, sy = 0, swiping = null, swipedAt = 0;
+  list.addEventListener('touchstart', e => {
+    const it = e.target.closest('.mitem'); if (!it || e.target.closest('.mren')) return;
+    sx = e.touches[0].clientX; sy = e.touches[0].clientY; swiping = it;
+  }, { passive: true });
+  list.addEventListener('touchmove', e => {
+    if (!swiping) return;
+    const dx = e.touches[0].clientX - sx, dy = e.touches[0].clientY - sy;
+    if (Math.abs(dx) < 30 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+    if (dx < 0) { closeAll(swiping); swiping.classList.add('open'); } else swiping.classList.remove('open');
+    swipedAt = Date.now(); swiping = null;
+  }, { passive: true });
+  list.addEventListener('touchend', () => { swiping = null; });
+  list.addEventListener('contextmenu', e => {
+    const it = e.target.closest('.mitem'); if (!it || e.target.closest('.mren')) return;
+    e.preventDefault();
+    const open = !it.classList.contains('open');
+    closeAll(); it.classList.toggle('open', open);
+  });
+  document.addEventListener('click', e => { if (!e.target.closest('#' + t + '_mlist .mitem.open')) closeAll(); });
+  list.addEventListener('click', e => {
+    if (Date.now() - swipedAt < 400) return;
+    const del = e.target.closest('[data-del]');
+    if (del) { S.memo = S.memo.filter(m => m.id !== del.dataset.del); save(); renderMemo(); return; }
+    const ren = e.target.closest('[data-ren]');
+    if (ren && !ren.closest('.mitem.open')) {
+      const m = S.memo.find(x => x.id === ren.dataset.ren);
+      const inp = document.createElement('input');
+      inp.className = 'mren'; inp.value = m.name;
+      ren.replaceWith(inp); inp.focus(); inp.select();
+      const done = ok => { if (ok && inp.value.trim()) m.name = inp.value.trim(); save(); renderMemo(); };
+      inp.addEventListener('keydown', ev => { if (ev.key === 'Enter') inp.blur(); if (ev.key === 'Escape') { inp.value = ''; inp.blur(); } });
+      inp.addEventListener('blur', () => done(true));
+      inp.addEventListener('click', ev => ev.stopPropagation());
+      return;
+    }
+    if (e.target.closest('.mren')) return;
+    const it = e.target.closest('.mitem');
+    if (it && it.classList.contains('open')) { it.classList.remove('open'); return; }
+    if (it) memoRestore(S.memo.find(m => m.id === it.dataset.id));
+  });
+});
+
 renderAll();
 </script>
 </body>
