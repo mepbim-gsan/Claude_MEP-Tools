@@ -57,6 +57,7 @@ select{font-family:var(--sans);font-size:.78rem}
 .res .v{font-family:var(--mono);font-size:.84rem;font-weight:500;white-space:nowrap}
 .res .v.ok{color:var(--green)}.res .v.over{color:var(--red)}
 .res .full{grid-column:1/-1}
+.res>div.sp{border:none}
 .stp{width:34px;height:32px;border:1.5px solid var(--bd);border-radius:7px;background:var(--sf2);font-size:1.05rem;color:var(--tx2);cursor:pointer;-webkit-tap-highlight-color:transparent}
 .stp:active{background:var(--accent);color:#fff}
 #g_n{width:56px;text-align:center}
@@ -268,7 +269,7 @@ select{font-family:var(--sans);font-size:.78rem}
 <div class="toast" id="toast"></div>
 
 <script>
-const APP_VERSION = 'v03_2026-11-25.7';
+const APP_VERSION = 'v03_2026-11-25.8';
 document.querySelectorAll('.app-ver').forEach(el => el.textContent = APP_VERSION);
 
 const RHO = 1.2, NU = 15.1e-6, MMAQ = 9.80665;
@@ -501,8 +502,8 @@ function renderCands(el, list, sel, onPick) {
 }
 
 function resHTML(items) {
-  return items.map(([k, v, cls, full]) =>
-    `<div${full ? ' class="full"' : ''}><div class="k">${k}</div><div class="v ${cls || ''}">${v}</div></div>`).join('');
+  return items.map(it => !it ? '<div class="sp"></div>' : it).map(it => typeof it === 'string' ? it : (([k, v, cls, full]) =>
+    `<div${full ? ' class="full"' : ''}><div class="k">${k}</div><div class="v ${cls || ''}">${v}</div></div>`)(it)).join('');
 }
 
 const PU = () => S.d.pu === 'mmAq' ? { k: 1 / MMAQ, u: 'mmAq' } : { k: 1, u: 'Pa' };
@@ -531,24 +532,22 @@ function renderDuctRes() {
   const L = ductLimits();
   const base = ductBaseQ(W, H, L), pu = PU();
   const t = +S.d.ins;
-  const items = [];
-  if (Q > 0) {
-    const c = ductCheck(Q, W, H, L);
-    const vRound = Q / 3600 / (Math.PI * c.De * c.De / 4e6);
-    items.push(
-      ['風速 [m/s]', fmt(c.v, 2), L.V ? (c.v <= L.V ? 'ok' : 'over') : ''],
-      [`摩擦損失 [${pu.u}/m]`, fmt(c.R * pu.k, pu.u === 'Pa' ? 3 : 4), L.R ? (c.R <= L.R ? 'ok' : 'over') : ''],
-      [`動圧 [${pu.u}]`, fmt(RHO * c.v * c.v / 2 * pu.k, pu.u === 'Pa' ? 1 : 2)],
-      ['丸換算風速 [m/s]', H ? fmt(vRound, 2) : '—'],
-    );
-  }
-  items.push(
+  const De = H ? deRect(W, H) : W;
+  const c = Q > 0 ? ductCheck(Q, W, H, L) : null;
+  const vRound = c ? Q / 3600 / (Math.PI * De * De / 4e6) : null;
+  // PC アプリ版と同じ並び（2列・行順）。以降は追加項目
+  const items = [
     ['アスペクト比', H ? fmt(Math.max(W, H) / Math.min(W, H), 2) : '—'],
-    ['相当直径 [mm]', fmt(H ? deRect(W, H) : W, 0)],
-    [`基準風量 [${UNIT_LBL[S.unit]}]`, base ? fmtN(toUnit(base)) : '—'],
+    ['風速 [m/s]', c ? fmt(c.v, 2) : '—', c && L.V ? (c.v <= L.V ? 'ok' : 'over') : ''],
+    [`動圧 [${pu.u}]`, c ? fmt(RHO * c.v * c.v / 2 * pu.k, pu.u === 'Pa' ? 2 : 3) : '—'],
+    [`摩擦損失 [${pu.u}/m]`, c ? fmt(c.R * pu.k, pu.u === 'Pa' ? 3 : 4) : '—', c && L.R ? (c.R <= L.R ? 'ok' : 'over') : ''],
+    [`基準風量 [${UNIT_LBL[S.unit]}]`, base ? fmtN(Math.floor(toUnit(base))) : '—'],
+    ['相当直径 [mm]', fmt(De, 0)],
+    null,
+    ['丸ダクト換算時風速 [m/s]', c && H ? fmt(vRound, 2) : '—'],
     ['断面積 [m²]', fmt(H ? W * H / 1e6 : Math.PI * W * W / 4e6, 4)],
-  );
-  if (Q > 0 && base) items.push(['基準風量比 [%]', fmt(Q / base * 100, 0), Q <= base * 1.0005 ? 'ok' : 'over']);
+    ['基準風量比 [%]', c && base ? fmt(Q / base * 100, 0) : '—', c && base ? (Q <= base * 1.0005 ? 'ok' : 'over') : ''],
+  ];
   if (t) items.push([`外形寸法（保温${t}）[mm]`, H ? `${W + 2 * t} x ${H + 2 * t}` : `${W + 2 * t}φ`, '', true]);
   $('d_res').innerHTML = resHTML(items);
 }
@@ -575,22 +574,26 @@ function renderGrilleRes() {
   const W = num($('g_W').value), H = num($('g_H').value), Q = getQ();
   if (!W) { $('g_res').innerHTML = resHTML([['サイズを入力するか、候補をタップしてください', '', '', true]]); return; }
   const ratio = num(S.g.ratio), Vs = num(S.g.V);
-  const n = Math.max(1, Math.floor(num(S.g.n) || 1));
+  const n = Math.max(1, Math.floor(num(S.g.n) || 1)), per = n > 1 ? '/台' : '';
   const A = H ? W * H / 1e6 : Math.PI * W * W / 4e6;
   const Ae = ratio ? A * ratio / 100 : null;
+  const q1 = Q > 0 ? Q / n : null;
+  const v = q1 && Ae ? q1 / 3600 / Ae : null;
+  const AeReq = q1 && Vs ? q1 / 3600 / Vs : null;
+  const baseQ = Ae && Vs ? Ae * Vs * 3600 : null;
+  // PC アプリ版と同じ並び（開口率・必要／面風速・有効／基準風量）。以降は追加項目
   const items = [
     ['開口率 [%]', ratio ? String(ratio) : '—'],
-    ['面積 [m²]', fmt(A, 3)],
-    ['有効面積 [m²]', fmt(Ae, 3)],
-    [`基準風量 [${UNIT_LBL[S.unit]}/台]`, Ae && Vs ? fmtN(toUnit(Ae * Vs * 3600)) : '—'],
+    [`必要面積 [m²${per}]`, AeReq && ratio ? fmt(AeReq / (ratio / 100), 3) : '—'],
+    ['面風速 [m/s]', v ? fmt(v, 2) : '—', v && Vs ? (v <= Vs ? 'ok' : 'over') : ''],
+    [`有効面積 [m²${per}]`, AeReq ? fmt(AeReq, 3) : '—'],
+    [`基準風量 [${UNIT_LBL[S.unit]}${per}]`, baseQ ? fmtN(Math.floor(toUnit(baseQ))) : '—'],
+    null,
+    ['選択サイズの面積 [m²]', fmt(A, 3)],
+    ['選択サイズの有効面積 [m²]', fmt(Ae, 3)],
+    ['基準風量比 [%]', q1 && baseQ ? fmt(q1 / baseQ * 100, 0) : '—', q1 && baseQ ? (q1 <= baseQ * 1.0005 ? 'ok' : 'over') : ''],
+    ['必要台数', Q > 0 && baseQ ? Math.ceil(Q / baseQ - 1e-9) + ' 台' : '—'],
   ];
-  if (Q > 0 && Ae) {
-    const v = Q / n / 3600 / Ae;
-    items.splice(1, 0, ['面風速 [m/s]', fmt(v, 2), Vs ? (v <= Vs ? 'ok' : 'over') : '']);
-    if (Vs) items.push(['基準風量比 [%]', fmt(Q / n / (Ae * Vs * 3600) * 100, 0), Q / n <= Ae * Vs * 3600 * 1.0005 ? 'ok' : 'over']);
-    items.push(['必要台数', Vs ? Math.ceil(Q / 3600 / (Ae * Vs) - 1e-9) + ' 台' : '—'],
-               ['必要面積 [m²/台]', Vs ? fmt(Q / n / 3600 / Vs / (ratio / 100), 3) : '—']);
-  }
   $('g_res').innerHTML = resHTML(items);
 }
 
